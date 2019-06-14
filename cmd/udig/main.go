@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/akamensky/argparse"
+	"github.com/netrixone/udig"
 	"net/url"
 	"os"
 	"sync"
-	"udig"
 )
 
 const prog = "udig"
