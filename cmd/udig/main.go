@@ -35,7 +35,7 @@ func resolveAll(domain string) {
 
 	go func() {
 		defer wg.Done()
-		resolveDns(domain)
+		resolveDNS(domain)
 	}()
 	go func() {
 		defer wg.Done()
@@ -43,14 +43,14 @@ func resolveAll(domain string) {
 	}()
 	go func() {
 		defer wg.Done()
-		resolveTls(domain)
+		resolveTLS(domain)
 	}()
 
 	wg.Wait()
 }
 
-func resolveDns(domain string) {
-	resolver := udig.NewDnsResolver()
+func resolveDNS(domain string) {
+	resolver := udig.NewDNSResolver()
 	resolutions := resolver.Resolve(domain)
 
 	for _, res := range resolutions {
@@ -71,8 +71,8 @@ func resolveWhois(domain string) {
 	}
 }
 
-func resolveTls(domain string) {
-	resolver := udig.NewTlsResolver()
+func resolveTLS(domain string) {
+	resolver := udig.NewTLSResolver()
 	res := resolver.Resolve(domain)
 
 	for _, cert := range res.Answers {

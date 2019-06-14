@@ -50,8 +50,8 @@ func (ssMap *StringStringMap) String() string {
 // to a bunch of the most interesting DNS records.
 // You can configure which query types are actually used
 // and you can also supply a custom name server.
-type DnsResolver struct {
-	DnsResolvable
+type DNSResolver struct {
+	DNSResolvable
 	QueryTypes      []uint16
 	NameServer      string
 	Client          *dns.Client
@@ -59,24 +59,24 @@ type DnsResolver struct {
 	resolvedDomains map[string]bool
 }
 
-type DnsResolvable interface {
-	Resolve(domain string) []DnsResolution
+type DNSResolvable interface {
+	Resolve(domain string) []DNSResolution
 }
 
 // Resolution of a single DNS query, naturally each DNS answer
 // can contain many records.
-type DnsResolution struct {
+type DNSResolution struct {
 	Resolution
-	Query   DnsQuery
+	Query   DNSQuery
 	Answers []dns.RR
 }
 
-func (res *DnsResolution) Type() ResolutionType {
+func (res *DNSResolution) Type() ResolutionType {
 	return TypeDNS
 }
 
 // DNS query for bookkeeping.
-type DnsQuery struct {
+type DNSQuery struct {
 	Domain     string
 	Type       string
 	NameServer string
@@ -125,27 +125,27 @@ type WhoisContact StringStringMap
 
 // Resolver responsible for resolution of a given domain
 // to a list of TLS certificates.
-type TlsResolver struct {
-	TlsResolvable
+type TLSResolver struct {
+	TLSResolvable
 	Client *http.Client
 }
 
-type TlsResolvable interface {
-	Resolve(domain string) *TlsResolution
+type TLSResolvable interface {
+	Resolve(domain string) *TLSResolution
 }
 
 // Resolution of a single TLS query, which yields a certificate chain.
-type TlsResolution struct {
+type TLSResolution struct {
 	Resolution
-	Query   TlsQuery
+	Query   TLSQuery
 	Answers []x509.Certificate
 }
 
-func (res *TlsResolution) Type() ResolutionType {
+func (res *TLSResolution) Type() ResolutionType {
 	return KindTLS
 }
 
 // TLS query for bookkeeping.
-type TlsQuery struct {
+type TLSQuery struct {
 	Domain string
 }

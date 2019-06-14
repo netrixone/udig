@@ -26,13 +26,13 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 
 	// Execute.
 	resolutions := resolver.Resolve("all.tens.ten")
 
 	// Assert.
-	assert.Len(t, resolutions, len(DefaultDnsQueryTypes))
+	assert.Len(t, resolutions, len(DefaultDNSQueryTypes))
 
 	// Count resolutions with a record (2 are spent on NS queries for all.tens.ten + tens.ten).
 	resolutionsWithRecord := 0
@@ -53,7 +53,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 	resolver.NameServer = "1.1.1.1"
 
 	// Execute.
@@ -93,7 +93,7 @@ func Test_When_DnsResolver_Resolve_finds_CNAME_Then_it_follows_target(t *testing
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 	resolver.QueryTypes = []uint16{dns.TypeA}
 
 	// Execute.
@@ -123,7 +123,7 @@ func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 	resolver.QueryTypes = []uint16{dns.TypeA}
 
 	// Execute.
@@ -145,7 +145,7 @@ func Test_That_findNameServerFor_dissects_NS_records(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 
 	// Execute.
 	nameServer := resolver.findNameServerFor("example.com")
@@ -168,7 +168,7 @@ func Test_That_findNameServerFor_caches_results(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDnsResolver()
+	resolver := NewDNSResolver()
 
 	// Execute.
 	_ = resolver.findNameServerFor("example.com")
@@ -195,8 +195,8 @@ func Test_dissectDomain_By_CNAME_record(t *testing.T) {
 func Test_dissectDomain_By_MX_record(t *testing.T) {
 	// Setup.
 	record := &dns.MX{
-		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMX},
-		Mx: "related.example.com.",
+		Hdr: dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMX},
+		Mx:  "related.example.com.",
 	}
 
 	// Execute.
@@ -209,7 +209,7 @@ func Test_dissectDomain_By_MX_record(t *testing.T) {
 func Test_dissectDomain_By_NSEC_record(t *testing.T) {
 	// Setup.
 	record := &dns.NSEC{
-		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeNSEC},
+		Hdr:        dns.RR_Header{Name: "example.com", Rrtype: dns.TypeNSEC},
 		NextDomain: "*.related.example.com.",
 	}
 
@@ -223,7 +223,7 @@ func Test_dissectDomain_By_NSEC_record(t *testing.T) {
 func Test_dissectDomain_By_KX_record(t *testing.T) {
 	// Setup.
 	record := &dns.KX{
-		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeKX},
+		Hdr:       dns.RR_Header{Name: "example.com", Rrtype: dns.TypeKX},
 		Exchanger: "related.example.com.",
 	}
 
@@ -237,8 +237,8 @@ func Test_dissectDomain_By_KX_record(t *testing.T) {
 func Test_dissectDomain_By_unsupported_record(t *testing.T) {
 	// Setup.
 	record := &dns.MB{
-		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMB},
-		Mb: "related.example.com.",
+		Hdr: dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMB},
+		Mb:  "related.example.com.",
 	}
 
 	// Execute.

@@ -19,18 +19,18 @@ func LogPanic(format string, a ...interface{}) {
 
 func LogErr(format string, a ...interface{}) {
 	if LogLevel <= LogLevelErr {
-		fmt.Fprintf(os.Stderr,"[!] " + format + "\n", a...)
+		fmt.Fprintf(os.Stderr, "[!] "+format+"\n", a...)
 	}
 }
 
 func LogInfo(format string, a ...interface{}) {
 	if LogLevel <= LogLevelInfo {
-		fmt.Printf("[+] " + format + "\n", a...)
+		fmt.Printf("[+] "+format+"\n", a...)
 	}
 }
 
 func LogDebug(format string, a ...interface{}) {
 	if LogLevel <= LogLevelDebug {
-		fmt.Printf("[~] " + format + "\n", a...)
+		fmt.Printf("[~] "+format+"\n", a...)
 	}
 }

@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	DefaultDnsQueryTypes = [...]uint16{ // List of default DNS RR types that we query.
+	// DefaultDNSQueryTypes is a list of default DNS RR types that we query.
+	DefaultDNSQueryTypes = [...]uint16{
 		dns.TypeA,
 		dns.TypeSOA,
 		dns.TypeMX,
@@ -123,17 +124,23 @@ func dissectDomain(record dns.RR) (domain string) {
 // DNS RESOLVER
 /////////////////////////////////////////
 
-func NewDnsResolver() *DnsResolver {
-	return &DnsResolver{
-		QueryTypes:      DefaultDnsQueryTypes[:],
+// NewDNSResolver creates a new DNS resolver instance pre-populated
+// with sensible defaults.
+func NewDNSResolver() *DNSResolver {
+	return &DNSResolver{
+		QueryTypes:      DefaultDNSQueryTypes[:],
 		Client:          &dns.Client{ReadTimeout: DefaultTimeout},
 		nameServerCache: map[string]string{},
 		resolvedDomains: map[string]bool{},
 	}
 }
 
-func (resolver *DnsResolver) Resolve(domain string) []DnsResolution {
-	var resolutions []DnsResolution
+// Resolve attempts to resolve a given domain for every DNS record
+// type defined in resolver.QueryTypes using either a user-supplied
+// name-server or dynamically resolved one for this domain.
+// Also attempts to resolve all related domains.
+func (resolver *DNSResolver) Resolve(domain string) []DNSResolution {
+	var resolutions []DNSResolution
 
 	// Make sure we don't repeat ourselves.
 	if resolver.isProcessed(domain) {
@@ -158,9 +165,9 @@ func (resolver *DnsResolver) Resolve(domain string) []DnsResolution {
 	return resolutions
 }
 
-func (resolver *DnsResolver) resolveOne(domain string, qType uint16, nameServer string) *DnsResolution {
-	resolution := &DnsResolution{
-		Query: DnsQuery{Domain: domain, Type: dns.TypeToString[qType], NameServer: nameServer},
+func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) *DNSResolution {
+	resolution := &DNSResolution{
+		Query: DNSQuery{Domain: domain, Type: dns.TypeToString[qType], NameServer: nameServer},
 	}
 
 	msg, err := queryOneCallback(domain, qType, nameServer, resolver.Client)
@@ -176,7 +183,7 @@ func (resolver *DnsResolver) resolveOne(domain string, qType uint16, nameServer 
 	return resolution
 }
 
-func (resolver *DnsResolver) resolveRelated(resolution *DnsResolution) (resolutions []DnsResolution) {
+func (resolver *DNSResolver) resolveRelated(resolution *DNSResolution) (resolutions []DNSResolution) {
 	relatedDomains := resolution.dissectDomains()
 
 	for _, relDomain := range relatedDomains {
@@ -193,7 +200,7 @@ func (resolver *DnsResolver) resolveRelated(resolution *DnsResolution) (resoluti
 	return resolutions
 }
 
-func (resolver *DnsResolver) findNameServerFor(domain string) string {
+func (resolver *DNSResolver) findNameServerFor(domain string) string {
 	// Use user-supplied NS if available.
 	if resolver.NameServer != "" {
 		return resolver.NameServer
@@ -225,7 +232,7 @@ func (resolver *DnsResolver) findNameServerFor(domain string) string {
 	return nameServer
 }
 
-func (resolver *DnsResolver) getNameServerFor(domain string) string {
+func (resolver *DNSResolver) getNameServerFor(domain string) string {
 	var nsRecord *dns.NS
 
 	// Do a NS query.
@@ -246,17 +253,17 @@ func (resolver *DnsResolver) getNameServerFor(domain string) string {
 		// NS record found -> take the NS name.
 		nameServerFqdn := nsRecord.Ns
 		return nameServerFqdn[:len(nameServerFqdn)-1] + ":53"
-	} else {
-		// No record found.
-		return ""
 	}
+
+	// No record found.
+	return ""
 }
 
-func (resolver *DnsResolver) isProcessed(domain string) bool {
+func (resolver *DNSResolver) isProcessed(domain string) bool {
 	return resolver.resolvedDomains[domain]
 }
 
-func (resolver *DnsResolver) addProcessed(domain string) {
+func (resolver *DNSResolver) addProcessed(domain string) {
 	resolver.resolvedDomains[domain] = true
 }
 
@@ -264,7 +271,7 @@ func (resolver *DnsResolver) addProcessed(domain string) {
 // DNS RESOLUTION
 /////////////////////////////////////////
 
-func (res *DnsResolution) dissectDomains() (domains []string) {
+func (res *DNSResolution) dissectDomains() (domains []string) {
 	for _, answer := range res.Answers {
 		if domain := dissectDomain(answer); domain != "" {
 			domains = append(domains, domain)
