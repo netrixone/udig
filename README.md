@@ -6,7 +6,8 @@ _**DISCLAIMER:** This tool is still under heavy development and the API might ch
 
 Feature set:
 
-- [x] Resolves a given domain to all interesting DNS records. Supports automatic NS discovery and automatic CNAME following.
+- [x] Resolves a given domain to all interesting DNS records. 
+- [x] Supports automatic NS discovery and resolution of related domains (CNAME, MX, KX, NSSEC).
 - [x] Resolves a given domain to a set of WHOIS contacts (selected properties only).
 - [x] Resolves a given domain to a TLS certificate chain.
 - [x] CLI application outputs all resolutions encoded as JSON strings.

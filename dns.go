@@ -21,6 +21,7 @@ var (
 		dns.TypeCERT,
 		dns.TypeDNAME,
 		dns.TypeOPT,
+		dns.TypeKX,
 		dns.TypeDS,
 		dns.TypeRRSIG,
 		dns.TypeNSEC,
@@ -80,10 +81,42 @@ func isSubdomain(domain string) bool {
 
 func parentDomainOf(domain string) string {
 	labels := strings.Split(domain, ".")
-	if len(labels) == 1 {
+	if len(labels) <= 2 {
+		// We don't want a TLD.
 		return ""
 	}
 	return strings.Join(labels[1:], ".")
+}
+
+func dissectDomain(record dns.RR) (domain string) {
+	switch record.Header().Rrtype {
+	case dns.TypeCNAME:
+		domain = (record).(*dns.CNAME).Target
+		break
+	case dns.TypeMX:
+		domain = (record).(*dns.MX).Mx
+		break
+	case dns.TypeNSEC:
+		domain = (record).(*dns.NSEC).NextDomain
+		break
+	case dns.TypeKX:
+		domain = (record).(*dns.KX).Exchanger
+		break
+	}
+
+	if domain != "" {
+		// Clean this.
+		if strings.HasSuffix(domain, ".") {
+			domain = strings.TrimSuffix(domain, ".")
+		}
+		if strings.HasPrefix(domain, "*.") {
+			domain = strings.TrimPrefix(domain, "*.")
+		}
+
+		LogDebug("%s: Found related domain for %s -> %s using %s.", TypeDNS, record.Header().Name, domain, dns.TypeToString[record.Header().Rrtype])
+	}
+
+	return domain
 }
 
 /////////////////////////////////////////
@@ -92,49 +125,50 @@ func parentDomainOf(domain string) string {
 
 func NewDnsResolver() *DnsResolver {
 	return &DnsResolver{
-		QueryTypes: DefaultDnsQueryTypes[:],
-		Client:     &dns.Client{ReadTimeout: DefaultTimeout},
+		QueryTypes:      DefaultDnsQueryTypes[:],
+		Client:          &dns.Client{ReadTimeout: DefaultTimeout},
+		nameServerCache: map[string]string{},
+		resolvedDomains: map[string]bool{},
 	}
 }
 
 func (resolver *DnsResolver) Resolve(domain string) []DnsResolution {
 	var resolutions []DnsResolution
 
-	// First find a name server for this domain (if not pre-defined).
-	if resolver.NameServer == "" {
-		resolver.NameServer = resolver.findNameServerFor(domain)
-		defer resolver.resetNameServer()
+	// Make sure we don't repeat ourselves.
+	if resolver.isProcessed(domain) {
+		return resolutions
 	}
-	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, resolver.NameServer, domain)
+	resolver.addProcessed(domain)
+
+	// First find a name server for this domain (if not pre-defined).
+	nameServer := resolver.findNameServerFor(domain)
+	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, nameServer, domain)
 
 	// Now do a DNS query for each record type, collecting the results.
 	for _, qType := range resolver.QueryTypes {
-		resolution := resolver.resolveOne(domain, qType)
+		resolution := resolver.resolveOne(domain, qType, nameServer)
 		resolutions = append(resolutions, *resolution)
 
-		// If this is just a CNAME record -> recurse with resolution.
-		if resolution.resolvesToCname() {
-			cnameRR := resolution.Answers[0].(*dns.CNAME)
-			resolution = resolver.resolveOne(cnameRR.Target, qType)
-			resolutions = append(resolutions, *resolution)
-		}
+		// Attempt to harvest and resolve related domains.
+		relResolutions := resolver.resolveRelated(resolution)
+		resolutions = append(resolutions, relResolutions...)
 	}
 
 	return resolutions
 }
 
-func (resolver *DnsResolver) resolveOne(domain string, qType uint16) *DnsResolution {
+func (resolver *DnsResolver) resolveOne(domain string, qType uint16, nameServer string) *DnsResolution {
 	resolution := &DnsResolution{
-		Query: DnsQuery{Domain: domain, Type: dns.TypeToString[qType]},
+		Query: DnsQuery{Domain: domain, Type: dns.TypeToString[qType], NameServer: nameServer},
 	}
 
-	msg, err := queryOneCallback(domain, qType, resolver.NameServer, resolver.Client)
+	msg, err := queryOneCallback(domain, qType, nameServer, resolver.Client)
 	if err != nil {
 		LogErr("%s: %s %s -> %s", TypeDNS, resolution.Query.Type, domain, err.Error())
 		return resolution
 	}
 
-	resolution.Query.NameServer = resolver.NameServer
 	for _, rr := range msg.Answer {
 		resolution.Answers = append(resolution.Answers, rr)
 	}
@@ -142,19 +176,51 @@ func (resolver *DnsResolver) resolveOne(domain string, qType uint16) *DnsResolut
 	return resolution
 }
 
+func (resolver *DnsResolver) resolveRelated(resolution *DnsResolution) (resolutions []DnsResolution) {
+	relatedDomains := resolution.dissectDomains()
+
+	for _, relDomain := range relatedDomains {
+		// Have we met this domain before?
+		if resolver.isProcessed(relDomain) {
+			// Skip.
+			continue
+		}
+
+		relResolutions := resolver.Resolve(relDomain)
+		resolutions = append(resolutions, relResolutions...)
+	}
+
+	return resolutions
+}
+
 func (resolver *DnsResolver) findNameServerFor(domain string) string {
+	// Use user-supplied NS if available.
+	if resolver.NameServer != "" {
+		return resolver.NameServer
+	}
+
+	// Check NS cache.
+	if resolver.nameServerCache[domain] != "" {
+		return resolver.nameServerCache[domain]
+	}
+
+	// Use DNS NS lookup.
 	nameServer := resolver.getNameServerFor(domain)
 
 	if nameServer != "" {
-		return nameServer
+		// OK, NS found.
 	} else if isSubdomain(domain) {
 		// This is a subdomain -> try the parent.
-		return resolver.findNameServerFor(parentDomainOf(domain))
+		LogDebug("%s: No NS found for subdomain %s -> trying parent domain.", TypeDNS, domain)
+		nameServer = resolver.findNameServerFor(parentDomainOf(domain))
 	} else {
 		// Fallback to local NS.
 		LogErr("%s: Could not resolve NS for domain %s -> falling back to local.", TypeDNS, domain)
 		nameServer = localNameServer
 	}
+
+	// Cache the result.
+	resolver.nameServerCache[domain] = nameServer
 
 	return nameServer
 }
@@ -178,7 +244,7 @@ func (resolver *DnsResolver) getNameServerFor(domain string) string {
 
 	if nsRecord != nil {
 		// NS record found -> take the NS name.
-		nameServerFqdn := msg.Answer[0].(*dns.NS).Ns
+		nameServerFqdn := nsRecord.Ns
 		return nameServerFqdn[:len(nameServerFqdn)-1] + ":53"
 	} else {
 		// No record found.
@@ -186,14 +252,23 @@ func (resolver *DnsResolver) getNameServerFor(domain string) string {
 	}
 }
 
-func (resolver *DnsResolver) resetNameServer() {
-	resolver.NameServer = ""
+func (resolver *DnsResolver) isProcessed(domain string) bool {
+	return resolver.resolvedDomains[domain]
+}
+
+func (resolver *DnsResolver) addProcessed(domain string) {
+	resolver.resolvedDomains[domain] = true
 }
 
 /////////////////////////////////////////
 // DNS RESOLUTION
 /////////////////////////////////////////
 
-func (res *DnsResolution) resolvesToCname() bool {
-	return len(res.Answers) != 0 && res.Answers[0].Header().Rrtype == dns.TypeCNAME
+func (res *DnsResolution) dissectDomains() (domains []string) {
+	for _, answer := range res.Answers {
+		if domain := dissectDomain(answer); domain != "" {
+			domains = append(domains, domain)
+		}
+	}
+	return domains
 }

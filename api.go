@@ -20,6 +20,7 @@ const (
 
 // Enum of resolution kinds (types).
 type ResolutionType string
+
 const (
 	TypeDNS   ResolutionType = "DNS"
 	TypeWHOIS ResolutionType = "WHOIS"
@@ -51,9 +52,11 @@ func (ssMap *StringStringMap) String() string {
 // and you can also supply a custom name server.
 type DnsResolver struct {
 	DnsResolvable
-	QueryTypes []uint16
-	NameServer string
-	Client     *dns.Client
+	QueryTypes      []uint16
+	NameServer      string
+	Client          *dns.Client
+	nameServerCache map[string]string
+	resolvedDomains map[string]bool
 }
 
 type DnsResolvable interface {

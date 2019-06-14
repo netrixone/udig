@@ -44,26 +44,11 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	assert.Equal(t, recordsAvailable-2, resolutionsWithRecord)
 }
 
-func Test_When_DnsResolver_Resolve_completes_Then_NameServer_is_reset(t *testing.T) {
+func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *testing.T) {
 	// Mock.
+	var usedNameServer string
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-		return &dns.Msg{}, nil
-	}
-
-	// Setup.
-	resolver := NewDnsResolver()
-	assert.Empty(t, resolver.NameServer)
-
-	// Execute.
-	resolver.Resolve("example.com")
-
-	// Assert.
-	assert.Empty(t, resolver.NameServer)
-}
-
-func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_is_kept(t *testing.T) {
-	// Mock.
-	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		usedNameServer = nameServer
 		return &dns.Msg{}, nil
 	}
 
@@ -75,7 +60,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_is_kept(t *t
 	resolver.Resolve("example.com")
 
 	// Assert.
-	assert.Equal(t, resolver.NameServer, "1.1.1.1")
+	assert.Equal(t, resolver.NameServer, usedNameServer)
 }
 
 func Test_When_DnsResolver_Resolve_finds_CNAME_Then_it_follows_target(t *testing.T) {
@@ -101,7 +86,7 @@ func Test_When_DnsResolver_Resolve_finds_CNAME_Then_it_follows_target(t *testing
 			rr := &msg.Answer[0]
 			(*rr).(*dns.A).A = net.IPv4(20, 20, 20, 20)
 		} else {
-			t.Error("Not mocked.")
+			msg = mockDnsResponse(qType, 0)
 		}
 
 		return msg, nil
@@ -147,6 +132,153 @@ func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
 	// Assert.
 	assert.Len(t, resolutions, 1)
 	assert.Len(t, resolutions[0].Answers, 0)
+}
+
+func Test_That_findNameServerFor_dissects_NS_records(t *testing.T) {
+	// Mock.
+	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		msg := mockDnsResponse(dns.TypeNS, 1)
+		rr := &msg.Answer[0]
+		(*rr).(*dns.NS).Ns = "ns.example.com."
+
+		return msg, nil
+	}
+
+	// Setup.
+	resolver := NewDnsResolver()
+
+	// Execute.
+	nameServer := resolver.findNameServerFor("example.com")
+
+	// Assert.
+	assert.Equal(t, "ns.example.com:53", nameServer)
+}
+
+func Test_That_findNameServerFor_caches_results(t *testing.T) {
+	// Mock.
+	var queryOneInvocations int
+	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		queryOneInvocations++
+
+		msg := mockDnsResponse(dns.TypeNS, 1)
+		rr := &msg.Answer[0]
+		(*rr).(*dns.NS).Ns = "ns.example.com."
+
+		return msg, nil
+	}
+
+	// Setup.
+	resolver := NewDnsResolver()
+
+	// Execute.
+	_ = resolver.findNameServerFor("example.com")
+	_ = resolver.findNameServerFor("example.com")
+
+	// Assert.
+	assert.Equal(t, 1, queryOneInvocations)
+}
+
+func Test_dissectDomain_By_CNAME_record(t *testing.T) {
+	// Setup.
+	record := &dns.CNAME{
+		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeCNAME},
+		Target: "related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomain(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
+func Test_dissectDomain_By_MX_record(t *testing.T) {
+	// Setup.
+	record := &dns.MX{
+		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMX},
+		Mx: "related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomain(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
+func Test_dissectDomain_By_NSEC_record(t *testing.T) {
+	// Setup.
+	record := &dns.NSEC{
+		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeNSEC},
+		NextDomain: "*.related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomain(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
+func Test_dissectDomain_By_KX_record(t *testing.T) {
+	// Setup.
+	record := &dns.KX{
+		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeKX},
+		Exchanger: "related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomain(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
+func Test_dissectDomain_By_unsupported_record(t *testing.T) {
+	// Setup.
+	record := &dns.MB{
+		Hdr:    dns.RR_Header{Name: "example.com", Rrtype: dns.TypeMB},
+		Mb: "related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomain(record)
+
+	// Assert.
+	assert.Empty(t, domain)
+}
+
+func Test_parentDomainOf_By_subdomain(t *testing.T) {
+	// Setup.
+	domain := "sub.example.com"
+
+	// Execute.
+	parent := parentDomainOf(domain)
+
+	// Assert.
+	assert.Equal(t, "example.com", parent)
+}
+
+func Test_parentDomainOf_By_domain(t *testing.T) {
+	// Setup.
+	domain := "example.com"
+
+	// Execute.
+	parent := parentDomainOf(domain)
+
+	// Assert.
+	assert.Empty(t, parent)
+}
+
+func Test_parentDomainOf_By_TLD(t *testing.T) {
+	// Setup.
+	domain := "com"
+
+	// Execute.
+	parent := parentDomainOf(domain)
+
+	// Assert.
+	assert.Empty(t, parent)
 }
 
 func mockDnsResponse(qType uint16, numRecords int) *dns.Msg {
