@@ -7,6 +7,11 @@
 
 **Simple GoLang tool for domain recon.**
 
+The purpose of this tool is to provide fast overview of a target domain setup. Several active scanning techniques
+are employed for this purpose like DNS ping-pong, TLS certificate scraping or WHOIS banner parsing. Some tools on the other
+hand are not - intentionally (e.g. nmap, brute-force, search engines etc.). This is not a full-blown DNS enumerator, 
+but rather something more unobtrusive and fast which can be deployed in long-term experiments with lots of targets.
+
 _**DISCLAIMER:** This tool is still under heavy development and the API might change without any considerations!_
 
 Feature set:
@@ -16,13 +21,16 @@ Feature set:
 - [x] Resolves a given domain to a set of WHOIS contacts (selected properties only).
 - [x] Resolves a given domain to a TLS certificate chain.
 - [x] CLI application outputs all resolutions encoded as JSON strings.
-- [x] Support multiple domains on the input.
-- [ ] Support parallel resolution of multiple domains at the same time.
+- [x] Supports multiple domains on the input.
+- [ ] Resolves IPs and domains found in SPF record.
+- [ ] Resolves domains in CSP header.
+- [ ] Supports a web-crawler to enumerate sub-domains.
+- [ ] Supports parallel resolution of multiple domains at the same time.
 - [ ] Clean CLI output (e.g. RAW values, replace numeric constants with more meaningful strings).
 
 ## Download as dependency
 
-`go get github.com/stuchl4n3k/udig`
+`go get github.com/netrixone/udig`
 
 ## CLI app
 
