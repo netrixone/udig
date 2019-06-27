@@ -10,6 +10,7 @@ type udigImpl struct {
 	resolvers       []Resolver
 	domainQueue     chan string
 	resolvedDomains map[string]bool
+	seenDomains     map[string]bool
 }
 
 // NewUdig creates a new Udig instances provisioned with
@@ -19,6 +20,7 @@ func NewUdig(extraResolvers ... []Resolver) Udig {
 	udig := &udigImpl{
 		domainQueue:     make(chan string, 1024),
 		resolvedDomains: map[string]bool{},
+		seenDomains:     map[string]bool{},
 		resolvers:       []Resolver{},
 	}
 
@@ -95,16 +97,14 @@ func (udig *udigImpl) shouldCrawlDomain(nextDomain string, resolution Resolution
 }
 
 func (udig *udigImpl) crawlRelatedDomains(resolutions []Resolution) {
-	seenDomains := map[string]bool{}
-
 	for _, resolution := range resolutions {
 		for _, nextDomain := range resolution.Domains() {
 			// Crawl new and related domains only.
-			if udig.isProcessed(nextDomain) || seenDomains[nextDomain] {
+			if udig.isProcessed(nextDomain) || udig.isSeen(nextDomain) {
 				continue
 			}
 
-			seenDomains[nextDomain] = true
+			udig.addSeen(nextDomain)
 
 			if !udig.shouldCrawlDomain(nextDomain, resolution) {
 				LogDebug("%s: Domain %s is not related to %s -> skipping.", resolution.Type(), nextDomain, resolution.Query())
@@ -124,4 +124,12 @@ func (udig *udigImpl) isProcessed(domain string) bool {
 
 func (udig *udigImpl) addProcessed(domain string) {
 	udig.resolvedDomains[domain] = true
+}
+
+func (udig *udigImpl) isSeen(domain string) bool {
+	return udig.seenDomains[domain]
+}
+
+func (udig *udigImpl) addSeen(domain string) {
+	udig.seenDomains[domain] = true
 }
