@@ -7,21 +7,24 @@ import (
 	"github.com/netrixone/udig"
 	"net/url"
 	"os"
-	"sync"
 )
 
-const prog = "udig"
-const version = "1.0"
-const author = "stuchl4n3k"
-const description = "ÜberDig - dig on steroids v" + version + " by " + author
+const (
+	prog        = "udig"
+	version     = "1.0"
+	author      = "stuchl4n3k"
+	description = "ÜberDig - dig on steroids v" + version + " by " + author
+)
 
-var banner = `
+var (
+	banner = `
  _   _ ____ ___ ____
 (_) (_|  _ |_ _/ ___|
 | | | | | | | | |  _
 | |_| | |_| | | |_| |
  \__,_|____|___\____| v`[1:] + version + `
 `
+)
 
 func resolveAll(domain string) {
 	// Some input checks.
@@ -30,54 +33,32 @@ func resolveAll(domain string) {
 		return
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(3)
-
-	go func() {
-		defer wg.Done()
-		resolveDNS(domain)
-	}()
-	go func() {
-		defer wg.Done()
-		resolveWhois(domain)
-	}()
-	go func() {
-		defer wg.Done()
-		resolveTLS(domain)
-	}()
-
-	wg.Wait()
-}
-
-func resolveDNS(domain string) {
-	resolver := udig.NewDNSResolver()
-	resolutions := resolver.Resolve(domain)
+	dig := udig.NewUdig()
+	resolutions := dig.Resolve(domain)
 
 	for _, res := range resolutions {
-		for _, answer := range res.Answers {
-			jsonValue, _ := json.Marshal(answer)
-			udig.LogInfo("%s: %s %s -> %s", res.Type(), res.Query.Type, res.Query.Domain, jsonValue)
+		switch res.Type() {
+		case udig.TypeDNS:
+			for _, rr := range (res).(*udig.DNSResolution).Records {
+				jsonValue, _ := json.Marshal(rr)
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+			}
+			break
+
+		case udig.TypeTLS:
+			for _, cert := range (res).(*udig.TLSResolution).Certificates {
+				jsonValue, _ := json.Marshal(cert)
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+			}
+			break
+
+		case udig.TypeWHOIS:
+			for _, contact := range (res).(*udig.WhoisResolution).Contacts {
+				jsonValue, _ := json.Marshal(contact)
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+			}
+			break
 		}
-	}
-}
-
-func resolveWhois(domain string) {
-	resolver := udig.NewWhoisResolver()
-	res := resolver.Resolve(domain)
-
-	for _, contact := range res.Answers {
-		jsonValue, _ := json.Marshal(contact)
-		udig.LogInfo("%s: %s -> %s", res.Type(), res.Query.Domain, jsonValue)
-	}
-}
-
-func resolveTLS(domain string) {
-	resolver := udig.NewTLSResolver()
-	res := resolver.Resolve(domain)
-
-	for _, cert := range res.Answers {
-		jsonValue, _ := json.Marshal(cert)
-		udig.LogInfo("%s: %s -> %s", res.Type(), res.Query.Domain, jsonValue)
 	}
 }
 

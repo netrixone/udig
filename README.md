@@ -26,6 +26,7 @@ Feature set:
 - [ ] Resolves domains in CSP header.
 - [ ] Supports a web-crawler to enumerate sub-domains.
 - [ ] Supports parallel resolution of multiple domains at the same time.
+- [ ] Colorized CLI output.
 - [ ] Clean CLI output (e.g. RAW values, replace numeric constants with more meaningful strings).
 
 ## Download as dependency

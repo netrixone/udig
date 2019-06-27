@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// SupportedWhoisProperties is a set of WHOIS properties that WhoisResolver honors.
 	SupportedWhoisProperties = map[string]bool{
 		"registry domain id":        true,
 		"registrant":                true,
@@ -33,42 +34,6 @@ var (
 		"address": true,
 	}
 )
-
-/////////////////////////////////////////
-// WHOIS RESOLVER
-/////////////////////////////////////////
-
-func NewWhoisResolver() *WhoisResolver {
-	return &WhoisResolver{
-		Client: whois.NewClient(DefaultTimeout),
-	}
-}
-
-func (resolver *WhoisResolver) Resolve(domain string) *WhoisResolution {
-	resolution := &WhoisResolution{
-		Query: WhoisQuery{domain},
-	}
-
-	// Prepare a request.
-	request, err := whois.NewRequest(domain)
-	if err != nil {
-		LogErr("%s: %s -> %s", TypeWHOIS, domain, err.Error())
-		return resolution
-	}
-
-	response, err := resolver.Client.Fetch(request)
-	if err != nil {
-		LogErr("%s: %s -> %s", TypeWHOIS, domain, err.Error())
-		return resolution
-	}
-
-	contacts := parseWhoisResponse(bytes.NewReader(response.Body))
-	for _, contact := range contacts {
-		resolution.Answers = append(resolution.Answers, contact)
-	}
-
-	return resolution
-}
 
 // Expect to receive a reader to text with 3 parts:
 // 1. Key-value pairs separated by colon (":")
@@ -129,4 +94,70 @@ func parseWhoisResponse(reader io.Reader) (contacts []WhoisContact) {
 	}
 
 	return contacts
+}
+
+/////////////////////////////////////////
+// WHOIS RESOLVER
+/////////////////////////////////////////
+
+// NewWhoisResolver creates a new WhoisResolver instance provisioned
+// with sensible defaults.
+func NewWhoisResolver() *WhoisResolver {
+	return &WhoisResolver{
+		Client: whois.NewClient(DefaultTimeout),
+	}
+}
+
+// Type returns "WHOIS".
+func (resolver *WhoisResolver) Type() ResolutionType {
+	return TypeWHOIS
+}
+
+// Resolve attempts to resolve a given domain using WHOIS query
+// yielding a list of WHOIS contacts.
+func (resolver *WhoisResolver) Resolve(domain string) Resolution {
+	resolution := &WhoisResolution{
+		ResolutionBase: &ResolutionBase{query: domain},
+	}
+
+	// Prepare a request.
+	request, err := whois.NewRequest(domain)
+	if err != nil {
+		LogErr("%s: %s -> %s", TypeWHOIS, domain, err.Error())
+		return resolution
+	}
+
+	response, err := resolver.Client.Fetch(request)
+	if err != nil {
+		LogErr("%s: %s -> %s", TypeWHOIS, domain, err.Error())
+		return resolution
+	}
+
+	contacts := parseWhoisResponse(bytes.NewReader(response.Body))
+	for _, contact := range contacts {
+		resolution.Contacts = append(resolution.Contacts, contact)
+	}
+
+	return resolution
+}
+
+/////////////////////////////////////////
+// WHOIS RESOLUTION
+/////////////////////////////////////////
+
+// Type returns "WHOIS".
+func (res *WhoisResolution) Type() ResolutionType {
+	return TypeWHOIS
+}
+
+// Domains returns a list of domains discovered in records within this Resolution.
+func (res *WhoisResolution) Domains() (domains []string) {
+	for _, contact := range res.Contacts {
+		for _, item := range contact {
+			if extracted := dissectDomainsFromString(item); len(extracted) > 0 {
+				domains = append(domains, extracted...)
+			}
+		}
+	}
+	return domains
 }

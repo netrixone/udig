@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
-	"strings"
 )
 
 var (
@@ -69,37 +68,36 @@ func queryOne(domain string, qType uint16, nameServer string, client *dns.Client
 		return nil, err
 	} else if res.Rcode != dns.RcodeSuccess {
 		// If the rCode wasn't successful, return an error with the rCode as the string.
-		rcodeStr := dns.RcodeToString[res.Rcode]
-		return nil, errors.New(rcodeStr)
+		return nil, errors.New(dns.RcodeToString[res.Rcode])
 	}
 
 	return res, nil
 }
 
-func isSubdomain(domain string) bool {
-	return dns.CountLabel(domain) >= 3
-}
-
-func parentDomainOf(domain string) string {
-	labels := strings.Split(domain, ".")
-	if len(labels) <= 2 {
-		// We don't want a TLD.
-		return ""
-	}
-	return strings.Join(labels[1:], ".")
-}
-
-func dissectDomain(record dns.RR) (domain string) {
+// @todo: support multiple results here (e.g. SOA, TXT)
+func dissectDomainFromRecord(record dns.RR) (domain string) {
+	// @todo: case dns.TypeTXT: scrape domain/IP from SPF record
 	switch record.Header().Rrtype {
+	case dns.TypeNS:
+		domain = (record).(*dns.NS).Ns
+		break
+
 	case dns.TypeCNAME:
 		domain = (record).(*dns.CNAME).Target
 		break
+
+	case dns.TypeSOA:
+		domain = (record).(*dns.SOA).Mbox
+		break
+
 	case dns.TypeMX:
 		domain = (record).(*dns.MX).Mx
 		break
+
 	case dns.TypeNSEC:
 		domain = (record).(*dns.NSEC).NextDomain
 		break
+
 	case dns.TypeKX:
 		domain = (record).(*dns.KX).Exchanger
 		break
@@ -107,14 +105,7 @@ func dissectDomain(record dns.RR) (domain string) {
 
 	if domain != "" {
 		// Clean this.
-		if strings.HasSuffix(domain, ".") {
-			domain = strings.TrimSuffix(domain, ".")
-		}
-		if strings.HasPrefix(domain, "*.") {
-			domain = strings.TrimPrefix(domain, "*.")
-		}
-
-		LogDebug("%s: Found related domain for %s -> %s using %s.", TypeDNS, record.Header().Name, domain, dns.TypeToString[record.Header().Rrtype])
+		domain = cleanDomain(domain)
 	}
 
 	return domain
@@ -135,69 +126,48 @@ func NewDNSResolver() *DNSResolver {
 	}
 }
 
+// Type returns "DNS".
+func (resolver *DNSResolver) Type() ResolutionType {
+	return TypeDNS
+}
+
 // Resolve attempts to resolve a given domain for every DNS record
 // type defined in resolver.QueryTypes using either a user-supplied
 // name-server or dynamically resolved one for this domain.
-// Also attempts to resolve all related domains.
-func (resolver *DNSResolver) Resolve(domain string) []DNSResolution {
-	var resolutions []DNSResolution
-
-	// Make sure we don't repeat ourselves.
-	if resolver.isProcessed(domain) {
-		return resolutions
-	}
-	resolver.addProcessed(domain)
-
+func (resolver *DNSResolver) Resolve(domain string) Resolution {
 	// First find a name server for this domain (if not pre-defined).
 	nameServer := resolver.findNameServerFor(domain)
 	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, nameServer, domain)
 
+	resolution := &DNSResolution{
+		ResolutionBase: &ResolutionBase{query: domain},
+		nameServer:     nameServer,
+	}
+
 	// Now do a DNS query for each record type, collecting the results.
 	for _, qType := range resolver.QueryTypes {
-		resolution := resolver.resolveOne(domain, qType, nameServer)
-		resolutions = append(resolutions, *resolution)
-
-		// Attempt to harvest and resolve related domains.
-		relResolutions := resolver.resolveRelated(resolution)
-		resolutions = append(resolutions, relResolutions...)
-	}
-
-	return resolutions
-}
-
-func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) *DNSResolution {
-	resolution := &DNSResolution{
-		Query: DNSQuery{Domain: domain, Type: dns.TypeToString[qType], NameServer: nameServer},
-	}
-
-	msg, err := queryOneCallback(domain, qType, nameServer, resolver.Client)
-	if err != nil {
-		LogErr("%s: %s %s -> %s", TypeDNS, resolution.Query.Type, domain, err.Error())
-		return resolution
-	}
-
-	for _, rr := range msg.Answer {
-		resolution.Answers = append(resolution.Answers, rr)
+		answers := resolver.resolveOne(domain, qType, nameServer)
+		resolution.Records = append(resolution.Records, answers...)
 	}
 
 	return resolution
 }
 
-func (resolver *DNSResolver) resolveRelated(resolution *DNSResolution) (resolutions []DNSResolution) {
-	relatedDomains := resolution.dissectDomains()
-
-	for _, relDomain := range relatedDomains {
-		// Have we met this domain before?
-		if resolver.isProcessed(relDomain) {
-			// Skip.
-			continue
-		}
-
-		relResolutions := resolver.Resolve(relDomain)
-		resolutions = append(resolutions, relResolutions...)
+func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) (answers []DNSRecordPair) {
+	msg, err := queryOneCallback(domain, qType, nameServer, resolver.Client)
+	if err != nil {
+		LogErr("%s: %s %s -> %s", TypeDNS, dns.TypeToString[qType], domain, err.Error())
+		return answers
 	}
 
-	return resolutions
+	for _, rr := range msg.Answer {
+		answers = append(answers, DNSRecordPair{
+			QueryType: qType,
+			Record:    rr,
+		})
+	}
+
+	return answers
 }
 
 func (resolver *DNSResolver) findNameServerFor(domain string) string {
@@ -259,21 +229,19 @@ func (resolver *DNSResolver) getNameServerFor(domain string) string {
 	return ""
 }
 
-func (resolver *DNSResolver) isProcessed(domain string) bool {
-	return resolver.resolvedDomains[domain]
-}
-
-func (resolver *DNSResolver) addProcessed(domain string) {
-	resolver.resolvedDomains[domain] = true
-}
-
 /////////////////////////////////////////
 // DNS RESOLUTION
 /////////////////////////////////////////
 
-func (res *DNSResolution) dissectDomains() (domains []string) {
-	for _, answer := range res.Answers {
-		if domain := dissectDomain(answer); domain != "" {
+// Type returns "DNS".
+func (res *DNSResolution) Type() ResolutionType {
+	return TypeDNS
+}
+
+// Domains returns a list of domains discovered in records within this Resolution.
+func (res *DNSResolution) Domains() (domains []string) {
+	for _, answer := range res.Records {
+		if domain := dissectDomainFromRecord(answer.Record); domain != "" {
 			domains = append(domains, domain)
 		}
 	}

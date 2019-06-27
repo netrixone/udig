@@ -2,11 +2,9 @@ package udig
 
 import (
 	"crypto/x509"
-	"fmt"
 	"github.com/domainr/whois"
 	"github.com/miekg/dns"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -15,43 +13,70 @@ import (
 /////////////////////////////////////////
 
 const (
-	DefaultTimeout = 5 * time.Second // Default timeout used in all network clients.
+	// DefaultTimeout is a default timeout used in all network clients.
+	DefaultTimeout = 5 * time.Second
 )
 
-// Enum of resolution kinds (types).
+// ResolutionType is an enumeration type for resolutions types.
 type ResolutionType string
 
 const (
-	TypeDNS   ResolutionType = "DNS"
+	// TypeDNS is a type of all DNS resolutions.
+	TypeDNS ResolutionType = "DNS"
+
+	// TypeWHOIS is a type of all WHOIS resolutions.
 	TypeWHOIS ResolutionType = "WHOIS"
-	KindTLS   ResolutionType = "TLS"
+
+	// TypeTLS is a type of all TLS resolutions.
+	TypeTLS ResolutionType = "TLS"
 )
 
-// Base contract for all Resolutions (i.e. results).
-type Resolution interface {
-	Type() ResolutionType // Returns a type of this resolution.
+// Udig is a high-level facade for domain resolution which:
+// 	1. delegates work to specific resolvers
+//  2. deals with domain crawling
+//  3. caches intermediate results and summarizes the outputs
+type Udig interface {
+	Resolve(domain string) []Resolution
 }
 
-type StringStringMap map[string]string
+// Resolver is an API contract for all Resolvers (i.e. modules that resolve domains).
+type Resolver interface {
+	Type() ResolutionType             // Returns a type of resolution that this resolver supports.
+	Resolve(domain string) Resolution // Resolves a given domain.
+}
 
-func (ssMap *StringStringMap) String() string {
-	strb := strings.Builder{}
-	for key, val := range *ssMap {
-		strb.WriteString(fmt.Sprintf("%s -> %s\n", key, val))
-	}
-	return strb.String()
+// Resolution is an API contract for all Resolutions (i.e. results).
+type Resolution interface {
+	Type() ResolutionType // Returns a type of this resolution.
+	Query() string        // Returns the queried domain.
+	Domains() []string    // Returns a list of domains discovered in this resolution.
+}
+
+// ResolutionBase is a shared implementation for all Resolutions (i.e. results).
+type ResolutionBase struct {
+	Resolution `json:"-"`
+	query      string
+}
+
+// Query getter.
+func (res *ResolutionBase) Query() string {
+	return res.query
 }
 
 /////////////////////////////////////////
 // DNS
 /////////////////////////////////////////
 
-// Resolver which is able to resolve a given domain
+// DNSResolver is a Resolver which is able to resolve a domain
 // to a bunch of the most interesting DNS records.
+//
 // You can configure which query types are actually used
 // and you can also supply a custom name server.
+// If you don't a name server for each domain is discovered
+// using NS record query, falling back to a local NS
+// (e.g. the one in /etc/resolv.conf).
 type DNSResolver struct {
-	DNSResolvable
+	Resolver
 	QueryTypes      []uint16
 	NameServer      string
 	Client          *dns.Client
@@ -59,93 +84,57 @@ type DNSResolver struct {
 	resolvedDomains map[string]bool
 }
 
-type DNSResolvable interface {
-	Resolve(domain string) []DNSResolution
-}
-
-// Resolution of a single DNS query, naturally each DNS answer
-// can contain many records.
+// DNSResolution is a DNS multi-query resolution yielding many DNS records
+// in a form of query-answer pairs.
 type DNSResolution struct {
-	Resolution
-	Query   DNSQuery
-	Answers []dns.RR
+	*ResolutionBase
+	Records    []DNSRecordPair
+	nameServer string
 }
 
-func (res *DNSResolution) Type() ResolutionType {
-	return TypeDNS
-}
-
-// DNS query for bookkeeping.
-type DNSQuery struct {
-	Domain     string
-	Type       string
-	NameServer string
+// DNSRecordPair is a pair of DNS record type used in the query
+// and a corresponding record found in the answer.
+type DNSRecordPair struct {
+	QueryType uint16
+	Record    dns.RR
 }
 
 /////////////////////////////////////////
 // WHOIS
 /////////////////////////////////////////
 
-// Resolver responsible for resolution of a given domain
-// to a list of WHOIS contacts.
+// WhoisResolver is a Resolver responsible for resolution of a given
+// domain to a list of WHOIS contacts.
 type WhoisResolver struct {
-	WhoisResolvable
+	Resolver
 	Client *whois.Client
 }
 
-type WhoisResolvable interface {
-	Resolve(domain string) *WhoisResolution
-}
-
-// Resolution of a single WHOIS query, each WHOIS query can correspond
-// to many contacts.
+// WhoisResolution is a WHOIS query resolution yielding many contacts.
 type WhoisResolution struct {
-	Resolution
-	Query   WhoisQuery
-	Answers []WhoisContact
+	*ResolutionBase
+	Contacts []WhoisContact
 }
 
-func (res *WhoisResolution) Type() ResolutionType {
-	return TypeWHOIS
-}
-
-// WHOIS query for bookkeeping.
-type WhoisQuery struct {
-	Domain string
-}
-
-// Every WHOIS contact is just a set of key/value pairs.
+// WhoisContact is just a set of key/value pairs.
+//
 // Note that all map keys are lowercase intentionally.
 // For a default list of supported properties refer to `udig.SupportedWhoisProperties`.
-type WhoisContact StringStringMap
+type WhoisContact map[string]string
 
 /////////////////////////////////////////
 // TLS
 /////////////////////////////////////////
 
-// Resolver responsible for resolution of a given domain
+// TLSResolver is a Resolver responsible for resolution of a given domain
 // to a list of TLS certificates.
 type TLSResolver struct {
-	TLSResolvable
+	Resolver
 	Client *http.Client
 }
 
-type TLSResolvable interface {
-	Resolve(domain string) *TLSResolution
-}
-
-// Resolution of a single TLS query, which yields a certificate chain.
+// TLSResolution is a TLS handshake resolution, which yields a certificate chain.
 type TLSResolution struct {
-	Resolution
-	Query   TLSQuery
-	Answers []x509.Certificate
-}
-
-func (res *TLSResolution) Type() ResolutionType {
-	return KindTLS
-}
-
-// TLS query for bookkeeping.
-type TLSQuery struct {
-	Domain string
+	*ResolutionBase
+	Certificates []x509.Certificate
 }
