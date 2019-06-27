@@ -3,6 +3,7 @@ package udig
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"net/http"
 )
 
@@ -12,11 +13,21 @@ import (
 
 // NewTLSResolver creates a new TLSResolver with sensible defaults.
 func NewTLSResolver() *TLSResolver {
-	transport := &http.Transport{
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-		TLSHandshakeTimeout: DefaultTimeout,
+	transport := http.DefaultTransport.(*http.Transport)
+
+	transport.DialContext = (&net.Dialer{
+		Timeout:   DefaultTimeout,
+		KeepAlive: DefaultTimeout,
+		DualStack: true,
+	}).DialContext
+
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	transport.TLSHandshakeTimeout = DefaultTimeout
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   DefaultTimeout,
 	}
-	client := &http.Client{Transport: transport}
 
 	return &TLSResolver{
 		Client: client,

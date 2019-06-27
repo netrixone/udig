@@ -14,7 +14,7 @@ import (
 
 const (
 	// DefaultTimeout is a default timeout used in all network clients.
-	DefaultTimeout = 5 * time.Second
+	DefaultTimeout = 3 * time.Second
 )
 
 // ResolutionType is an enumeration type for resolutions types.
