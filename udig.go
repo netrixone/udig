@@ -16,7 +16,7 @@ type udigImpl struct {
 // NewUdig creates a new Udig instances provisioned with
 // all supported resolvers. You can also supply your own
 // resolvers.
-func NewUdig(extraResolvers ... []Resolver) Udig {
+func NewUdig(extraResolvers ...Resolver) Udig {
 	udig := &udigImpl{
 		domainQueue:     make(chan string, 1024),
 		resolvedDomains: map[string]bool{},
@@ -27,6 +27,7 @@ func NewUdig(extraResolvers ... []Resolver) Udig {
 	udig.resolvers = append(udig.resolvers, NewDNSResolver())
 	udig.resolvers = append(udig.resolvers, NewWhoisResolver())
 	udig.resolvers = append(udig.resolvers, NewTLSResolver())
+	udig.resolvers = append(udig.resolvers, extraResolvers...)
 
 	return udig
 }
