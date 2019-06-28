@@ -34,6 +34,16 @@ Feature set:
 
 `go get github.com/netrixone/udig`
 
+## Basic usage
+
+```go
+dig := udig.NewUdig()
+resolutions := dig.Resolve("example.com")
+for _, res := range resolutions {
+	...
+}
+```
+
 ## CLI app
 
 ### Build
@@ -56,7 +66,7 @@ Arguments:
   -d  --domain   Domain to resolve
 ```
 
-### Example
+### Demo
 
 ```bash
 
