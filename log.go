@@ -25,14 +25,14 @@ func LogPanic(format string, a ...interface{}) {
 // LogErr formats and prints a given log on STDERR.
 func LogErr(format string, a ...interface{}) {
 	if LogLevel <= LogLevelErr {
-		fmt.Fprintf(os.Stderr, "[!] "+format+"\n", a...)
+		fmt.Fprintf(os.Stderr, "\033[31m[!] "+format+"\n\033[0m", a...)
 	}
 }
 
 // LogInfo formats and prints a given log on STDOUT.
 func LogInfo(format string, a ...interface{}) {
 	if LogLevel <= LogLevelInfo {
-		fmt.Printf("[+] "+format+"\n", a...)
+		fmt.Printf("\033[32m[+] "+format+"\n\033[0m", a...)
 	}
 }
 
