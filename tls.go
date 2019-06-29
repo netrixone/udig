@@ -102,9 +102,5 @@ func dissectDomainsFromCert(cert *x509.Certificate) (domains []string) {
 		haystack = append(haystack, uri.Host)
 	}
 
-	for _, hay := range haystack {
-		domains = append(domains, dissectDomainsFromString(hay)...)
-	}
-
-	return domains
+	return dissectDomainsFromStrings(haystack)
 }
