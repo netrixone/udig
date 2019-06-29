@@ -11,6 +11,7 @@ var (
 	// DefaultDNSQueryTypes is a list of default DNS RR types that we query.
 	DefaultDNSQueryTypes = [...]uint16{
 		dns.TypeA,
+		dns.TypeNS,
 		dns.TypeSOA,
 		dns.TypeMX,
 		dns.TypeTXT,
@@ -76,7 +77,6 @@ func queryOne(domain string, qType uint16, nameServer string, client *dns.Client
 
 // @todo: support multiple results here (e.g. SOA, TXT)
 func dissectDomainFromRecord(record dns.RR) (domain string) {
-	// @todo: case dns.TypeTXT: scrape domain/IP from SPF record
 	switch record.Header().Rrtype {
 	case dns.TypeNS:
 		domain = (record).(*dns.NS).Ns
@@ -92,6 +92,18 @@ func dissectDomainFromRecord(record dns.RR) (domain string) {
 
 	case dns.TypeMX:
 		domain = (record).(*dns.MX).Mx
+		break
+
+	case dns.TypeTXT:
+		// @todo: scrape IP from SPF
+		domains := dissectDomainsFromStrings((record).(*dns.TXT).Txt)
+		if len(domains) > 0 {
+			domain = domains[0]
+		}
+		break
+
+	case dns.TypeRRSIG:
+		domain = (record).(*dns.RRSIG).SignerName
 		break
 
 	case dns.TypeNSEC:

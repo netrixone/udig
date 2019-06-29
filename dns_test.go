@@ -134,6 +134,37 @@ func Test_dissectDomain_By_NS_record(t *testing.T) {
 	assert.Equal(t, "ns1.example.com", domain)
 }
 
+func Test_dissectDomain_By_TXT_record(t *testing.T) {
+	// Setup.
+	record := &dns.TXT{
+		Hdr: dns.RR_Header{Name: "example.com", Rrtype: dns.TypeTXT},
+		Txt:  []string{
+			"foo; bar; baz=1029umadmcald;1205+%!$ 0",
+			"foo; bar; baz=related.example.com;afasf=asd123 1",
+		},
+	}
+
+	// Execute.
+	domain := dissectDomainFromRecord(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
+func Test_dissectDomain_By_RRSIG_record(t *testing.T) {
+	// Setup.
+	record := &dns.RRSIG{
+		Hdr:        dns.RR_Header{Name: "example.com", Rrtype: dns.TypeRRSIG},
+		SignerName: "related.example.com.",
+	}
+
+	// Execute.
+	domain := dissectDomainFromRecord(record)
+
+	// Assert.
+	assert.Equal(t, "related.example.com", domain)
+}
+
 func Test_dissectDomain_By_CNAME_record(t *testing.T) {
 	// Setup.
 	record := &dns.CNAME{

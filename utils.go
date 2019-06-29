@@ -31,6 +31,13 @@ func init() {
 	domainPattern.Longest()
 }
 
+func dissectDomainsFromStrings(haystacks []string) (domains []string) {
+	for _, haystack := range haystacks {
+		domains = append(domains, dissectDomainsFromString(haystack)...)
+	}
+	return domains
+}
+
 func dissectDomainsFromString(haystack string) []string {
 	domains := domainPattern.FindAllString(haystack, -1)
 	for i := range domains {
