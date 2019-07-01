@@ -85,7 +85,7 @@ func (udig *udigImpl) shouldCrawlDomain(nextDomain string, resolution Resolution
 	switch resolution.Type() {
 	case TypeDNS:
 		for _, rr := range resolution.(*DNSResolution).Records {
-			if rr.Record.Header().Rrtype == dns.TypeCNAME && rr.Record.(*dns.CNAME).Target == nextDomain {
+			if rr.Record.Header().Rrtype == dns.TypeCNAME && rr.Record.RR.(*dns.CNAME).Target == nextDomain {
 				// Follow DNS CNAME pointers.
 				return true
 			}

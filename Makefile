@@ -6,6 +6,7 @@ all: build test
 
 clean:
 		$(GOCMD) clean -i $(BINARY_NAME)
+		rm -f $(BINARY_NAME)
 
 build: deps
 		$(GOCMD) install

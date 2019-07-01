@@ -3,6 +3,7 @@ package udig
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/domainr/whois"
 	"io"
 	"strings"
@@ -160,4 +161,42 @@ func (res *WhoisResolution) Domains() (domains []string) {
 		}
 	}
 	return domains
+}
+
+/////////////////////////////////////////
+// WHOIS CONTACT
+/////////////////////////////////////////
+
+func (contact *WhoisContact) String() string {
+	cMap := map[string]string(*contact)
+	var entries []string
+
+	if cMap["name"] != "" {
+		entries = append(entries, "name: "+cMap["name"])
+	}
+	if cMap["subject"] != "" {
+		entries = append(entries, "subject: "+cMap["subject"])
+	}
+	if cMap["address"] != "" {
+		entries = append(entries, "address: "+cMap["address"])
+	}
+	if cMap["registrant"] != "" {
+		entries = append(entries, "registrant: "+cMap["registrant"])
+	}
+	if cMap["registrant organization"] != "" {
+		entries = append(entries, "registrant organization: "+cMap["registrant organization"])
+	}
+	if cMap["registrant country"] != "" {
+		entries = append(entries, "registrant country: "+cMap["registrant country"])
+	} else if cMap["registrant state/province"] != "" {
+		entries = append(entries, "registrant state/province: "+cMap["registrant state/province"])
+	}
+
+	if len(entries) == 0 {
+		for key, val := range cMap {
+			entries = append(entries, fmt.Sprintf("%s: %s", key, val))
+		}
+	}
+
+	return strings.Join(entries, ", ")
 }

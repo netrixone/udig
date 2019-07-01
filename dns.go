@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
+	"strings"
 )
 
 var (
@@ -175,7 +176,7 @@ func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer 
 	for _, rr := range msg.Answer {
 		answers = append(answers, DNSRecordPair{
 			QueryType: qType,
-			Record:    rr,
+			Record:    &DNSRecord{rr},
 		})
 	}
 
@@ -253,9 +254,20 @@ func (res *DNSResolution) Type() ResolutionType {
 // Domains returns a list of domains discovered in records within this Resolution.
 func (res *DNSResolution) Domains() (domains []string) {
 	for _, answer := range res.Records {
-		if domain := dissectDomainFromRecord(answer.Record); domain != "" {
+		if domain := dissectDomainFromRecord(answer.Record.RR); domain != "" {
 			domains = append(domains, domain)
 		}
 	}
 	return domains
+}
+
+/////////////////////////////////////////
+// DNS RECORD
+/////////////////////////////////////////
+
+func (record *DNSRecord) String() string {
+	return fmt.Sprintf("%s %s",
+		dns.TypeToString[record.RR.Header().Rrtype],
+		strings.Replace(record.RR.String(), record.RR.Header().String(), "", 1),
+	)
 }

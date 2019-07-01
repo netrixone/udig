@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/akamensky/argparse"
+	"github.com/miekg/dns"
 	"github.com/netrixone/udig"
 	"net/url"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 const (
 	prog        = "udig"
-	version     = "1.0"
+	version     = "1.1"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )
@@ -25,6 +26,7 @@ var (
  \__,_|____|___\____| v`[1:] + version + `
 `
 )
+var outputJson = false
 
 func resolveAll(domain string) {
 	// Some input checks.
@@ -40,22 +42,19 @@ func resolveAll(domain string) {
 		switch res.Type() {
 		case udig.TypeDNS:
 			for _, rr := range (res).(*udig.DNSResolution).Records {
-				jsonValue, _ := json.Marshal(rr)
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+				udig.LogInfo("%s: %s %s -> %s", res.Type(), dns.TypeToString[rr.QueryType], res.Query(), formatPayload(rr.Record))
 			}
 			break
 
 		case udig.TypeTLS:
 			for _, cert := range (res).(*udig.TLSResolution).Certificates {
-				jsonValue, _ := json.Marshal(cert)
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&cert))
 			}
 			break
 
 		case udig.TypeWHOIS:
 			for _, contact := range (res).(*udig.WhoisResolution).Contacts {
-				jsonValue, _ := json.Marshal(contact)
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), jsonValue)
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&contact))
 			}
 			break
 		}
@@ -74,10 +73,20 @@ func isValidDomain(domain string) bool {
 	return true
 }
 
+func formatPayload(resolution fmt.Stringer) string {
+	if outputJson {
+		result, _ := json.Marshal(resolution)
+		return string(result)
+	} else {
+		return resolution.String()
+	}
+}
+
 func main() {
 	parser := argparse.NewParser(prog, description)
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
+	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
 	domains := parser.List("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
 
 	err := parser.Parse(os.Args)
@@ -99,6 +108,8 @@ func main() {
 	} else {
 		udig.LogLevel = udig.LogLevelInfo
 	}
+
+	outputJson = *jsonOutput
 
 	fmt.Println(banner)
 

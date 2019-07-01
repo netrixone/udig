@@ -3,6 +3,7 @@ package udig
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"net/http"
 )
@@ -47,7 +48,7 @@ func (resolver *TLSResolver) Resolve(domain string) Resolution {
 
 	certificates := resolver.fetchTLSCertChain(domain)
 	for _, cert := range certificates {
-		resolution.Certificates = append(resolution.Certificates, *cert)
+		resolution.Certificates = append(resolution.Certificates, TLSCertificate{*cert})
 	}
 
 	return resolution
@@ -85,7 +86,23 @@ func (res *TLSResolution) Domains() (domains []string) {
 	return domains
 }
 
-func dissectDomainsFromCert(cert *x509.Certificate) (domains []string) {
+/////////////////////////////////////////
+// DNS RECORD
+/////////////////////////////////////////
+
+func (cert *TLSCertificate) String() string {
+	subject := cert.Subject.CommonName
+	if subject == "" {
+		subject = cert.Subject.String()
+	}
+	issuer := cert.Issuer.CommonName
+	if issuer == "" {
+		issuer = cert.Issuer.String()
+	}
+	return fmt.Sprintf("subject: %s, issuer: %s, domains: %v", subject, issuer, cert.DNSNames)
+}
+
+func dissectDomainsFromCert(cert *TLSCertificate) (domains []string) {
 	var haystack []string
 	haystack = append(haystack, cert.CRLDistributionPoints...)
 	haystack = append(haystack, cert.DNSNames...)

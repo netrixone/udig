@@ -96,7 +96,12 @@ type DNSResolution struct {
 // and a corresponding record found in the answer.
 type DNSRecordPair struct {
 	QueryType uint16
-	Record    dns.RR
+	Record    *DNSRecord
+}
+
+// DNSRecord is a wrapper for the actual DNS resource record.
+type DNSRecord struct {
+	dns.RR
 }
 
 /////////////////////////////////////////
@@ -136,5 +141,10 @@ type TLSResolver struct {
 // TLSResolution is a TLS handshake resolution, which yields a certificate chain.
 type TLSResolution struct {
 	*ResolutionBase
-	Certificates []x509.Certificate
+	Certificates []TLSCertificate
+}
+
+// TLSCertificate is a wrapper for the actual x509.Certificate.
+type TLSCertificate struct {
+	x509.Certificate
 }
