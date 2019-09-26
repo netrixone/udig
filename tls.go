@@ -87,7 +87,7 @@ func (res *TLSResolution) Domains() (domains []string) {
 }
 
 /////////////////////////////////////////
-// DNS RECORD
+// TLS CERTIFICATE
 /////////////////////////////////////////
 
 func (cert *TLSCertificate) String() string {
