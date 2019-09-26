@@ -24,7 +24,7 @@ Feature set:
 - [x] Unobtrusive human-readable CLI output as well as machine readable JSON
 - [x] Supports multiple domains on the input
 - [x] Colorized output
-- [x] Resolves domains in HTTP CSP header
+- [x] Resolves domains in HTTP headers
 - [ ] Resolves IPs and domains found in SPF record
 - [ ] Supports a web-crawler to enumerate sub-domains
 - [ ] Supports parallel resolution of multiple domains at the same time

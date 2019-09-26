@@ -10,6 +10,8 @@ import (
 var (
 	// DefaultHTTPHeaders is a list of default HTTP header names that we look for.
 	DefaultHTTPHeaders = [...]string{
+		"access-control-allow-origin",
+		"alt-svc",
 		"content-security-policy",
 		"content-security-policy-report-only",
 	}
