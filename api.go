@@ -29,6 +29,9 @@ const (
 
 	// TypeTLS is a type of all TLS resolutions.
 	TypeTLS ResolutionType = "TLS"
+
+	// TypeHTTP is a type of all HTTP resolutions.
+	TypeHTTP ResolutionType = "HTTP"
 )
 
 // Udig is a high-level facade for domain resolution which:
@@ -147,4 +150,28 @@ type TLSResolution struct {
 // TLSCertificate is a wrapper for the actual x509.Certificate.
 type TLSCertificate struct {
 	x509.Certificate
+}
+
+/////////////////////////////////////////
+// HTTP
+/////////////////////////////////////////
+
+// HTTPResolver is a Resolver responsible for resolution of a given domain
+// to a list of corresponding HTTP headers.
+type HTTPResolver struct {
+	Resolver
+	Headers []string
+	Client  *http.Client
+}
+
+// HTTPResolution is a HTTP header resolution yielding many HTTP protocol headers.
+type HTTPResolution struct {
+	*ResolutionBase
+	Headers []HTTPHeader
+}
+
+// HTTPHeader is a pair of HTTP header name and corresponding value(s).
+type HTTPHeader struct {
+	Name  string
+	Value []string
 }

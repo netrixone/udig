@@ -27,6 +27,7 @@ func NewUdig(extraResolvers ...Resolver) Udig {
 	udig.resolvers = append(udig.resolvers, NewDNSResolver())
 	udig.resolvers = append(udig.resolvers, NewWhoisResolver())
 	udig.resolvers = append(udig.resolvers, NewTLSResolver())
+	udig.resolvers = append(udig.resolvers, NewHTTPResolver())
 	udig.resolvers = append(udig.resolvers, extraResolvers...)
 
 	return udig

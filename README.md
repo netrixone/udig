@@ -21,12 +21,11 @@ Feature set:
 - [x] Resolves a given domain to a TLS certificate chain
 - [x] Supports automatic NS discovery with custom override
 - [x] Dissects domains from resolutions and resolves them recursively
-- [x] CLI application supports JSON payload format
+- [x] Unobtrusive human-readable CLI output as well as machine readable JSON
 - [x] Supports multiple domains on the input
-- [x] Colorized CLI output
-- [x] Clean CLI output (e.g. RAW values, replace numeric constants with more meaningful strings)
+- [x] Colorized output
+- [x] Resolves domains in HTTP CSP header
 - [ ] Resolves IPs and domains found in SPF record
-- [ ] Resolves domains in CSP header
 - [ ] Supports a web-crawler to enumerate sub-domains
 - [ ] Supports parallel resolution of multiple domains at the same time
 

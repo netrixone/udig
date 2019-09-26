@@ -12,7 +12,7 @@ import (
 
 const (
 	prog        = "udig"
-	version     = "1.1"
+	version     = "1.2"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )
@@ -55,6 +55,12 @@ func resolveAll(domain string) {
 		case udig.TypeWHOIS:
 			for _, contact := range (res).(*udig.WhoisResolution).Contacts {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&contact))
+			}
+			break
+
+		case udig.TypeHTTP:
+			for _, header := range (res).(*udig.HTTPResolution).Headers {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&header))
 			}
 			break
 		}
