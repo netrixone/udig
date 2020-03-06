@@ -28,7 +28,6 @@ func NewHTTPResolver() *HTTPResolver {
 	transport.DialContext = (&net.Dialer{
 		Timeout:   DefaultTimeout,
 		KeepAlive: DefaultTimeout,
-		DualStack: true,
 	}).DialContext
 
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
