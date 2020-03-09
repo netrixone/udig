@@ -128,10 +128,10 @@ func Test_dissectDomain_By_NS_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "ns1.example.com", domain)
+	assert.Equal(t, "ns1.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_TXT_record(t *testing.T) {
@@ -145,10 +145,10 @@ func Test_dissectDomain_By_TXT_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_RRSIG_record(t *testing.T) {
@@ -159,10 +159,10 @@ func Test_dissectDomain_By_RRSIG_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_CNAME_record(t *testing.T) {
@@ -173,10 +173,10 @@ func Test_dissectDomain_By_CNAME_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_SOA_record(t *testing.T) {
@@ -187,10 +187,10 @@ func Test_dissectDomain_By_SOA_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_MX_record(t *testing.T) {
@@ -201,10 +201,10 @@ func Test_dissectDomain_By_MX_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_NSEC_record(t *testing.T) {
@@ -215,10 +215,10 @@ func Test_dissectDomain_By_NSEC_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_KX_record(t *testing.T) {
@@ -229,10 +229,10 @@ func Test_dissectDomain_By_KX_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Equal(t, "related.example.com", domain)
+	assert.Equal(t, "related.example.com", domains[0])
 }
 
 func Test_dissectDomain_By_unsupported_record(t *testing.T) {
@@ -243,10 +243,10 @@ func Test_dissectDomain_By_unsupported_record(t *testing.T) {
 	}
 
 	// Execute.
-	domain := dissectDomainFromRecord(record)
+	domains := dissectDomainsFromRecord(record)
 
 	// Assert.
-	assert.Empty(t, domain)
+	assert.Empty(t, domains)
 }
 
 func Test_parentDomainOf_By_subdomain(t *testing.T) {

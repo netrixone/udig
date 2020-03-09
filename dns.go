@@ -76,74 +76,65 @@ func queryOne(domain string, qType uint16, nameServer string, client *dns.Client
 	return res, nil
 }
 
-// @todo: support multiple results here (e.g. SOA, TXT)
-func dissectDomainFromRecord(record dns.RR) (domain string) {
+func dissectDomainsFromRecord(record dns.RR) (domains []string) {
 	switch record.Header().Rrtype {
 	case dns.TypeNS:
-		domain = (record).(*dns.NS).Ns
+		domains = append(domains, (record).(*dns.NS).Ns)
 		break
 
 	case dns.TypeCNAME:
-		domain = (record).(*dns.CNAME).Target
+		domains = append(domains, (record).(*dns.CNAME).Target)
 		break
 
 	case dns.TypeSOA:
-		domain = (record).(*dns.SOA).Mbox
+		domains = append(domains, (record).(*dns.SOA).Mbox)
 		break
 
 	case dns.TypeMX:
-		domain = (record).(*dns.MX).Mx
+		domains = append(domains, (record).(*dns.MX).Mx)
 		break
 
 	case dns.TypeTXT:
-		domains := dissectDomainsFromStrings((record).(*dns.TXT).Txt)
-		if len(domains) > 0 {
-			domain = domains[0]
-		}
+		domains = dissectDomainsFromStrings((record).(*dns.TXT).Txt)
 		break
 
 	case dns.TypeRRSIG:
-		domain = (record).(*dns.RRSIG).SignerName
+		domains = append(domains, (record).(*dns.RRSIG).SignerName)
 		break
 
 	case dns.TypeNSEC:
-		domain = (record).(*dns.NSEC).NextDomain
+		domains = append(domains, (record).(*dns.NSEC).NextDomain)
 		break
 
 	case dns.TypeKX:
-		domain = (record).(*dns.KX).Exchanger
+		domains = append(domains, (record).(*dns.KX).Exchanger)
 		break
 	}
 
-	if domain != "" {
-		// Clean this.
-		domain = cleanDomain(domain)
+	for i := range domains {
+		domains[i] = cleanDomain(domains[i])
 	}
 
-	return domain
+	return domains
 }
 
-// @todo: support multiple results here
-func dissectIPFromRecord(record dns.RR) (ip string) {
+func dissectIPsFromRecord(record dns.RR) (ips []string) {
 	switch record.Header().Rrtype {
 	case dns.TypeA:
-		ip = (record).(*dns.A).A.String()
+		ips = append(ips, (record).(*dns.A).A.String())
 		break
 
 	case dns.TypeAAAA:
-		ip = (record).(*dns.AAAA).AAAA.String()
+		ips = append(ips, (record).(*dns.AAAA).AAAA.String())
 		break
 
 	case dns.TypeTXT:
 		// For SPF typically.
-		ips := dissectIpsFromStrings((record).(*dns.TXT).Txt)
-		if len(ips) > 0 {
-			ip = ips[0]
-		}
+		ips = dissectIpsFromStrings((record).(*dns.TXT).Txt)
 		break
 	}
 
-	return ip
+	return ips
 }
 
 /////////////////////////////////////////
@@ -276,9 +267,7 @@ func (res *DNSResolution) Type() ResolutionType {
 // Domains returns a list of domains discovered in records within this Resolution.
 func (res *DNSResolution) Domains() (domains []string) {
 	for _, answer := range res.Records {
-		if domain := dissectDomainFromRecord(answer.Record.RR); domain != "" {
-			domains = append(domains, domain)
-		}
+		domains = append(domains, dissectDomainsFromRecord(answer.Record.RR)...)
 	}
 	return domains
 }
@@ -286,9 +275,7 @@ func (res *DNSResolution) Domains() (domains []string) {
 // IPs returns a list of IP addresses discovered in this resolution.
 func (res *DNSResolution) IPs() (ips []string) {
 	for _, answer := range res.Records {
-		if ip := dissectIPFromRecord(answer.Record.RR); ip != "" {
-			ips = append(ips, ip)
-		}
+		ips = append(ips, dissectIPsFromRecord(answer.Record.RR)...)
 	}
 	return ips
 }
