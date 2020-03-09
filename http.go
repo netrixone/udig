@@ -77,8 +77,8 @@ func (resolver *HTTPResolver) Type() ResolutionType {
 	return TypeHTTP
 }
 
-// Resolve resolves a given domain to a list of corresponding HTTP headers.
-func (resolver *HTTPResolver) Resolve(domain string) Resolution {
+// ResolveDomain resolves a given domain to a list of corresponding HTTP headers.
+func (resolver *HTTPResolver) ResolveDomain(domain string) Resolution {
 	resolution := &HTTPResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}

@@ -96,7 +96,6 @@ func dissectDomainFromRecord(record dns.RR) (domain string) {
 		break
 
 	case dns.TypeTXT:
-		// @todo: scrape IP from SPF
 		domains := dissectDomainsFromStrings((record).(*dns.TXT).Txt)
 		if len(domains) > 0 {
 			domain = domains[0]
@@ -124,6 +123,29 @@ func dissectDomainFromRecord(record dns.RR) (domain string) {
 	return domain
 }
 
+// @todo: support multiple results here
+func dissectIPFromRecord(record dns.RR) (ip string) {
+	switch record.Header().Rrtype {
+	case dns.TypeA:
+		ip = (record).(*dns.A).A.String()
+		break
+
+	case dns.TypeAAAA:
+		ip = (record).(*dns.AAAA).AAAA.String()
+		break
+
+	case dns.TypeTXT:
+		// For SPF typically.
+		ips := dissectIpsFromStrings((record).(*dns.TXT).Txt)
+		if len(ips) > 0 {
+			ip = ips[0]
+		}
+		break
+	}
+
+	return ip
+}
+
 /////////////////////////////////////////
 // DNS RESOLVER
 /////////////////////////////////////////
@@ -144,10 +166,10 @@ func (resolver *DNSResolver) Type() ResolutionType {
 	return TypeDNS
 }
 
-// Resolve attempts to resolve a given domain for every DNS record
+// ResolveDomain attempts to resolve a given domain for every DNS record
 // type defined in resolver.QueryTypes using either a user-supplied
 // name-server or dynamically resolved one for this domain.
-func (resolver *DNSResolver) Resolve(domain string) Resolution {
+func (resolver *DNSResolver) ResolveDomain(domain string) Resolution {
 	// First find a name server for this domain (if not pre-defined).
 	nameServer := resolver.findNameServerFor(domain)
 	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, nameServer, domain)
@@ -259,6 +281,16 @@ func (res *DNSResolution) Domains() (domains []string) {
 		}
 	}
 	return domains
+}
+
+// IPs returns a list of IP addresses discovered in this resolution.
+func (res *DNSResolution) IPs() (ips []string)  {
+	for _, answer := range res.Records {
+		if ip := dissectIPFromRecord(answer.Record.RR); ip != "" {
+			ips = append(ips, ip)
+		}
+	}
+	return ips
 }
 
 /////////////////////////////////////////

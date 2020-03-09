@@ -40,8 +40,8 @@ func (resolver *TLSResolver) Type() ResolutionType {
 	return TypeTLS
 }
 
-// Resolve resolves a given domain to a list of TLS certificates.
-func (resolver *TLSResolver) Resolve(domain string) Resolution {
+// ResolveDomain resolves a given domain to a list of TLS certificates.
+func (resolver *TLSResolver) ResolveDomain(domain string) Resolution {
 	resolution := &TLSResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}

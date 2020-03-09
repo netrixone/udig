@@ -28,7 +28,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	resolver := NewDNSResolver()
 
 	// Execute.
-	resolution := resolver.Resolve("all.tens.ten").(*DNSResolution)
+	resolution := resolver.ResolveDomain("all.tens.ten").(*DNSResolution)
 
 	// Assert.
 
@@ -52,7 +52,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *
 	resolver.NameServer = "1.1.1.1"
 
 	// Execute.
-	resolver.Resolve("example.com")
+	resolver.ResolveDomain("example.com")
 
 	// Assert.
 	assert.Equal(t, resolver.NameServer, usedNameServer)
@@ -70,7 +70,7 @@ func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
 	resolver.QueryTypes = []uint16{dns.TypeA}
 
 	// Execute.
-	resolution := resolver.Resolve("example.com")
+	resolution := resolver.ResolveDomain("example.com")
 
 	// Assert.
 	assert.Len(t, resolution.Domains(), 0)

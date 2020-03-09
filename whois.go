@@ -114,9 +114,9 @@ func (resolver *WhoisResolver) Type() ResolutionType {
 	return TypeWHOIS
 }
 
-// Resolve attempts to resolve a given domain using WHOIS query
+// ResolveDomain attempts to resolve a given domain using WHOIS query
 // yielding a list of WHOIS contacts.
-func (resolver *WhoisResolver) Resolve(domain string) Resolution {
+func (resolver *WhoisResolver) ResolveDomain(domain string) Resolution {
 	resolution := &WhoisResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}

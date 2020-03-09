@@ -63,6 +63,12 @@ func resolveAll(domain string) {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&header))
 			}
 			break
+
+		case udig.TypeBGP:
+			for _, as := range (res).(*udig.BGPResolution).Records {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&as))
+			}
+			break
 		}
 	}
 }

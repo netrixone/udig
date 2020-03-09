@@ -32,6 +32,9 @@ const (
 
 	// TypeHTTP is a type of all HTTP resolutions.
 	TypeHTTP ResolutionType = "HTTP"
+
+	// TypeBGP is a type of all BGP resolutions.
+	TypeBGP ResolutionType = "BGP"
 )
 
 // Udig is a high-level facade for domain resolution which:
@@ -40,19 +43,27 @@ const (
 //  3. caches intermediate results and summarizes the outputs
 type Udig interface {
 	Resolve(domain string) []Resolution
+	AddDomainResolver(resolver DomainResolver)
+	AddIPResolver(resolver IPResolver)
 }
 
-// Resolver is an API contract for all Resolvers (i.e. modules that resolve domains).
-type Resolver interface {
-	Type() ResolutionType             // Returns a type of resolution that this resolver supports.
-	Resolve(domain string) Resolution // Resolves a given domain.
+// DomainResolver is an API contract for all Resolver modules that resolve domains.
+// Discovered domains that relate to the original query are recursively resolved.
+type DomainResolver interface {
+	ResolveDomain(domain string) Resolution // Resolves a given domain.
+}
+
+// IPResolver is an API contract for all Resolver modules that resolve IPs.
+type IPResolver interface {
+	ResolveIP(ip string) Resolution // Resolves a given IP.
 }
 
 // Resolution is an API contract for all Resolutions (i.e. results).
 type Resolution interface {
 	Type() ResolutionType // Returns a type of this resolution.
-	Query() string        // Returns the queried domain.
+	Query() string        // Returns the queried domain or IP.
 	Domains() []string    // Returns a list of domains discovered in this resolution.
+	IPs() []string        // Returns a list of IP addresses discovered in this resolution.
 }
 
 // ResolutionBase is a shared implementation for all Resolutions (i.e. results).
@@ -64,6 +75,18 @@ type ResolutionBase struct {
 // Query getter.
 func (res *ResolutionBase) Query() string {
 	return res.query
+}
+
+// Domains returns a list of domains discovered in this resolution.
+func (res *ResolutionBase) Domains() (domains []string) {
+	// Not supported by default.
+	return domains
+}
+
+// IPs returns a list of IP addresses discovered in this resolution.
+func (res *ResolutionBase) IPs() (ips []string) {
+	// Not supported by default.
+	return ips
 }
 
 /////////////////////////////////////////
@@ -79,7 +102,7 @@ func (res *ResolutionBase) Query() string {
 // using NS record query, falling back to a local NS
 // (e.g. the one in /etc/resolv.conf).
 type DNSResolver struct {
-	Resolver
+	DomainResolver
 	QueryTypes      []uint16
 	NameServer      string
 	Client          *dns.Client
@@ -114,7 +137,7 @@ type DNSRecord struct {
 // WhoisResolver is a Resolver responsible for resolution of a given
 // domain to a list of WHOIS contacts.
 type WhoisResolver struct {
-	Resolver
+	DomainResolver
 	Client *whois.Client
 }
 
@@ -137,7 +160,7 @@ type WhoisContact map[string]string
 // TLSResolver is a Resolver responsible for resolution of a given domain
 // to a list of TLS certificates.
 type TLSResolver struct {
-	Resolver
+	DomainResolver
 	Client *http.Client
 }
 
@@ -159,7 +182,7 @@ type TLSCertificate struct {
 // HTTPResolver is a Resolver responsible for resolution of a given domain
 // to a list of corresponding HTTP headers.
 type HTTPResolver struct {
-	Resolver
+	DomainResolver
 	Headers []string
 	Client  *http.Client
 }
@@ -174,4 +197,34 @@ type HTTPResolution struct {
 type HTTPHeader struct {
 	Name  string
 	Value []string
+}
+
+/////////////////////////////////////////
+// BGP
+/////////////////////////////////////////
+
+// BGPResolver is a Resolver which is able to resolve an IP
+// to AS name and ASN.
+//
+// Internally this resolver is leveraging a DNS interface of
+// IP-to-ASN lookup service by Team Cymru.
+type BGPResolver struct {
+	IPResolver
+	Client        *dns.Client
+	cachedResults map[string]*BGPResolution
+}
+
+// BGPResolution is a BGP resolution of a given IP yielding AS records.
+type BGPResolution struct {
+	*ResolutionBase
+	Records []ASRecord
+}
+
+// ASRecord contains information about an Autonomous System (AS).
+type ASRecord struct {
+	Name      string
+	ASN       uint32
+	BGPPrefix string
+	Registry  string
+	Allocated string
 }
