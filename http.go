@@ -17,6 +17,34 @@ var (
 	}
 )
 
+// fetchHeaders connects to a given URL and on successful connection returns
+// a map of HTTP headers in the response.
+func fetchHeaders(url string) http.Header {
+	transport := http.DefaultTransport.(*http.Transport)
+
+	transport.DialContext = (&net.Dialer{
+		Timeout:   DefaultTimeout,
+		KeepAlive: DefaultTimeout,
+	}).DialContext
+
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	transport.TLSHandshakeTimeout = DefaultTimeout
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   DefaultTimeout,
+	}
+
+	response, err := client.Get(url)
+	if err != nil {
+		// Don't bother trying to find CSP on non-TLS sites.
+		LogErr("HTTP: Could not GET %s - the cause was: %s.", url, err.Error())
+		return map[string][]string{}
+	}
+
+	return response.Header
+}
+
 /////////////////////////////////////////
 // HTTP RESOLVER
 /////////////////////////////////////////
@@ -55,7 +83,7 @@ func (resolver *HTTPResolver) Resolve(domain string) Resolution {
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
-	headers := resolver.fetchHeaders("https://" + domain)
+	headers := fetchHeaders("https://" + domain)
 	for _, name := range resolver.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
 		if len(dissectDomainsFromStrings(value)) > 0 {
@@ -64,33 +92,6 @@ func (resolver *HTTPResolver) Resolve(domain string) Resolution {
 	}
 
 	return resolution
-}
-
-func (resolver *HTTPResolver) fetchHeaders(url string) http.Header {
-	transport := http.DefaultTransport.(*http.Transport)
-
-	transport.DialContext = (&net.Dialer{
-		Timeout:   DefaultTimeout,
-		KeepAlive: DefaultTimeout,
-		DualStack: true,
-	}).DialContext
-
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = DefaultTimeout
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   DefaultTimeout,
-	}
-
-	response, err := client.Get(url)
-	if err != nil {
-		// Don't bother trying to find CSP on non-TLS sites.
-		LogErr("HTTP: Could not GET %s - the cause was: %s.", url, err.Error())
-		return map[string][]string{}
-	}
-
-	return response.Header
 }
 
 /////////////////////////////////////////
