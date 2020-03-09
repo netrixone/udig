@@ -8,11 +8,10 @@
 **Simple GoLang tool for domain recon.**
 
 The purpose of this tool is to provide fast overview of a target domain setup. Several active scanning techniques
-are employed for this purpose like DNS ping-pong, TLS certificate scraping or WHOIS banner parsing. Some tools on the other
-hand are not - intentionally (e.g. nmap, brute-force, search engines etc.). This is not a full-blown DNS enumerator, 
-but rather something more unobtrusive and fast which can be deployed in long-term experiments with lots of targets.
-
-_**DISCLAIMER:** This tool is still under heavy development and the API might change without any considerations!_
+are employed for this purpose like DNS ping-pong, TLS certificate scraping, WHOIS banner parsing and more. 
+Some tools on the other hand are not - intentionally (e.g. nmap, brute-force, search engines etc.). This is not 
+a full-blown DNS enumerator, but rather something more unobtrusive and fast which can be deployed in long-term 
+experiments with lots of targets.
 
 Feature set:
 
@@ -25,9 +24,11 @@ Feature set:
 - [x] Supports multiple domains on the input
 - [x] Colorized output
 - [x] Resolves domains in HTTP headers
-- [ ] Resolves IPs and domains found in SPF record
-- [ ] Supports a web-crawler to enumerate sub-domains
-- [ ] Supports parallel resolution of multiple domains at the same time
+- [x] Parses IPs found in SPF record
+- [x] Looks up BGP AS for each discovered IP
+- [ ] Looks up GeoIP record for each discovered IP
+- [ ] Attempts to detect DNS wildcards
+- [ ] Supports graph output
 
 ## Download as dependency
 
@@ -41,6 +42,35 @@ resolutions := dig.Resolve("example.com")
 for _, res := range resolutions {
 	...
 }
+```
+
+## API
+
+```
+                                                         +------------+
+                                                         |            |
+                                                  +------+    Udig    +------------+
+Delegates:                                        |      |            |            |
+                                                  |      +------------+            |
+                                                  |*                               |*
+                                      +------------------+                  +------------+
+                                      |  DomainResolver  |                  | IPResolver |
+             +----------------------> +------------------+                  +------------+
+             |                        ^      ^           ^                         ^     ^
+Implements:  |                  +-----+      |           |                         |     +-------+
+             |                  |            |           |                         |             |
+     +-------------+ +-------------+ +--------------+ +---------------+        +-------------+ +---------------+
+     | DNSResolver | | TLSResolver | | HTTPResolver | | WhoisResolver |        | BGPResolver | | GeoipResolver |
+     +-------------+ +-------------+ +--------------+ +---------------+        +-------------+ +---------------+
+             |              |                |               |                        |                |
+             |              |                |               |                        |                |
+Produces:    |              |                |               |                        |                |
+             |              |                |               |                        |                |
+             |*             |*               |*              |*                       |*               |*
+      +-----------+ +----------------+ +------------+ +--------------+           +----------+   +-------------+
+      | DNSRecord | | TLSCertificate | | HTTPHeader | | WhoisContact |           | ASRecord |   | GeoipRecord |
+      +-----------+ +----------------+ +------------+ +--------------+           +----------+   +-------------+
+
 ```
 
 ## CLI app
@@ -75,6 +105,7 @@ Arguments:
 * https://github.com/akamensky/argparse - Argparse for golang
 * https://github.com/miekg/dns - DNS library in Go 
 * https://github.com/domainr/whois - Whois client for Go
+* https://www.team-cymru.com/IP-ASN-mapping.html - IP to ASN mapping service by Team Cymru
 
 ## License
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetrixone%2Fudig.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetrixone%2Fudig?ref=badge_large)
