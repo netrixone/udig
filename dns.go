@@ -284,7 +284,7 @@ func (res *DNSResolution) Domains() (domains []string) {
 }
 
 // IPs returns a list of IP addresses discovered in this resolution.
-func (res *DNSResolution) IPs() (ips []string)  {
+func (res *DNSResolution) IPs() (ips []string) {
 	for _, answer := range res.Records {
 		if ip := dissectIPFromRecord(answer.Record.RR); ip != "" {
 			ips = append(ips, ip)

@@ -138,7 +138,7 @@ func Test_dissectDomain_By_TXT_record(t *testing.T) {
 	// Setup.
 	record := &dns.TXT{
 		Hdr: dns.RR_Header{Name: "example.com", Rrtype: dns.TypeTXT},
-		Txt:  []string{
+		Txt: []string{
 			"foo; bar; baz=1029umadmcald;1205+%!$ 0",
 			"foo; bar; baz=related.example.com;afasf=asd123 1",
 		},

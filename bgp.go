@@ -12,7 +12,7 @@ var (
 	// For parsing ASN records, eg. "13335 | 104.28.16.0/20 | US | arin | 2014-03-28"
 	asnRecordPattern = regexp.MustCompile(`([0-9]+) \| (.+) \| ([A-Z]+) \| (.+) \| (.+)`)
 	// For parsing AS records e.g. "13335 | US | arin | 2010-07-14 | CLOUDFLARENET, US"
-	asRecordPattern  = regexp.MustCompile(`([0-9]+) \| ([A-Z]+) \| (.+) \| (.+) \| (.+)`)
+	asRecordPattern = regexp.MustCompile(`([0-9]+) \| ([A-Z]+) \| (.+) \| (.+) \| (.+)`)
 )
 
 // lookupASN uses Team Cymru's IP->ASN lookup via DNS, returns matching ASN records.
