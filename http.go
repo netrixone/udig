@@ -58,7 +58,7 @@ func (resolver *HTTPResolver) Resolve(domain string) Resolution {
 	headers := resolver.fetchHeaders("https://" + domain)
 	for _, name := range resolver.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
-		if len(value) > 0 {
+		if len(dissectDomainsFromStrings(value)) > 0 {
 			resolution.Headers = append(resolution.Headers, HTTPHeader{name, value})
 		}
 	}
