@@ -26,7 +26,7 @@ Feature set:
 - [x] Resolves domains in HTTP headers
 - [x] Parses IPs found in SPF record
 - [x] Looks up BGP AS for each discovered IP
-- [ ] Looks up GeoIP record for each discovered IP
+- [x] Looks up GeoIP record for each discovered IP
 - [ ] Attempts to detect DNS wildcards
 - [ ] Supports graph output
 
@@ -100,11 +100,12 @@ Arguments:
 
 ![udig demo](doc/res/udig_demo.gif)
 
-## Dependencies
+## Dependencies and attributions
 
 * https://github.com/akamensky/argparse - Argparse for golang
 * https://github.com/miekg/dns - DNS library in Go 
 * https://github.com/domainr/whois - Whois client for Go
+* https://github.com/ip2location/ip2location-go - GeoIP localization package. This product uses IP2Location LITE data available from [https://lite.ip2location.com](https://lite.ip2location.com).
 * https://www.team-cymru.com/IP-ASN-mapping.html - IP to ASN mapping service by Team Cymru
 
 ## License

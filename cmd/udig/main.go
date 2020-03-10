@@ -28,7 +28,7 @@ var (
 )
 var outputJson = false
 
-func resolveAll(domain string) {
+func resolve(domain string) {
 	// Some input checks.
 	if !isValidDomain(domain) {
 		udig.LogErr("'%s' does not appear like a valid domain to me -> skipping.", domain)
@@ -69,6 +69,12 @@ func resolveAll(domain string) {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&as))
 			}
 			break
+
+		case udig.TypeGEO:
+			if (res).(*udig.GeoResolution).Record != nil {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.GeoResolution).Record))
+			}
+			break
 		}
 	}
 }
@@ -89,9 +95,8 @@ func formatPayload(resolution fmt.Stringer) string {
 	if outputJson {
 		result, _ := json.Marshal(resolution)
 		return string(result)
-	} else {
-		return resolution.String()
 	}
+	return resolution.String()
 }
 
 func main() {
@@ -99,7 +104,7 @@ func main() {
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
 	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
-	domains := parser.List("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
+	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
 
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -110,7 +115,7 @@ func main() {
 	if *printVersion {
 		fmt.Println(version)
 		os.Exit(0)
-	} else if len(*domains) == 0 {
+	} else if *domain == "" {
 		fmt.Fprint(os.Stderr, parser.Usage(err))
 		os.Exit(1)
 	}
@@ -124,10 +129,5 @@ func main() {
 	outputJson = *jsonOutput
 
 	fmt.Println(banner)
-
-	// Resolve all domains (sequentially).
-	// @todo: goroutine this with a concurrency limiter
-	for _, domain := range *domains {
-		resolveAll(domain)
-	}
+	resolve(*domain)
 }

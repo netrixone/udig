@@ -34,6 +34,7 @@ func NewUdig() Udig {
 	udig.AddDomainResolver(NewHTTPResolver())
 
 	udig.AddIPResolver(NewBGPResolver())
+	udig.AddIPResolver(NewGeoResolver())
 
 	return udig
 }

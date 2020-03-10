@@ -35,6 +35,9 @@ const (
 
 	// TypeBGP is a type of all BGP resolutions.
 	TypeBGP ResolutionType = "BGP"
+
+	// TypeGEO is a type of all GeoIP resolutions.
+	TypeGEO ResolutionType = "GEO"
 )
 
 // Udig is a high-level facade for domain resolution which:
@@ -227,4 +230,26 @@ type ASRecord struct {
 	BGPPrefix string
 	Registry  string
 	Allocated string
+}
+
+/////////////////////////////////////////
+// GEO
+/////////////////////////////////////////
+
+// GeoResolver is a Resolver which is able to resolve an IP to a geographical location.
+type GeoResolver struct {
+	IPResolver
+	enabled       bool
+	cachedResults map[string]*GeoResolution
+}
+
+// GeoResolution is a GeoIP resolution of a given IP yielding geographical records.
+type GeoResolution struct {
+	*ResolutionBase
+	Record *GeoRecord
+}
+
+// GeoRecord contains information about a geographical location.
+type GeoRecord struct {
+	CountryCode string
 }
