@@ -4,16 +4,24 @@ import (
 	"errors"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 )
 
 func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *testing.T) {
 	// Mock.
 	const recordsAvailable = 5
+
+	counterMux := sync.Mutex{}
 	invocationCount := 0
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
 		count := recordsAvailable - invocationCount
+
+		// We need to count with a mutex, because DNS queries are run concurrently.
+		counterMux.Lock()
 		invocationCount++
+		counterMux.Unlock()
+
 		if count > 0 {
 			count = 1
 		} else {
@@ -98,9 +106,13 @@ func Test_That_findNameServerFor_dissects_NS_records(t *testing.T) {
 
 func Test_That_findNameServerFor_caches_results(t *testing.T) {
 	// Mock.
-	var queryOneInvocations int
+	counterMux := sync.Mutex{}
+	var invocationCount int
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-		queryOneInvocations++
+		// We need to count with a mutex, because DNS queries are run concurrently.
+		counterMux.Lock()
+		invocationCount++
+		counterMux.Unlock()
 
 		msg := mockDNSResponse(dns.TypeNS, 1)
 		rr := &msg.Answer[0]
@@ -117,7 +129,7 @@ func Test_That_findNameServerFor_caches_results(t *testing.T) {
 	_ = resolver.findNameServerFor("example.com")
 
 	// Assert.
-	assert.Equal(t, 1, queryOneInvocations)
+	assert.Equal(t, 1, invocationCount)
 }
 
 func Test_dissectDomain_By_NS_record(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"github.com/miekg/dns"
 	"net"
 	"strings"
+	"sync"
 )
 
 var (
@@ -170,10 +171,22 @@ func (resolver *DNSResolver) ResolveDomain(domain string) Resolution {
 		nameServer:     nameServer,
 	}
 
-	// Now do a DNS query for each record type, collecting the results.
+	// Now do a DNS query for each record type (in parallel).
+	recordChannel := make(chan []DNSRecordPair, 128)
+	var wg sync.WaitGroup
+	wg.Add(len(resolver.QueryTypes))
+
 	for _, qType := range resolver.QueryTypes {
-		answers := resolver.resolveOne(domain, qType, nameServer)
-		resolution.Records = append(resolution.Records, answers...)
+		go func(qType uint16) {
+			recordChannel <- resolver.resolveOne(domain, qType, nameServer)
+			wg.Done()
+		}(qType)
+	}
+	wg.Wait()
+
+	// Collect the records.
+	for len(recordChannel) > 0 {
+		resolution.Records = append(resolution.Records, <-recordChannel...)
 	}
 
 	return resolution
