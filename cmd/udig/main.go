@@ -12,7 +12,7 @@ import (
 
 const (
 	prog        = "udig"
-	version     = "1.2"
+	version     = "1.3"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )

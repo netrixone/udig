@@ -75,17 +75,22 @@ Produces:    |              |                |               |                  
 
 ## CLI app
 
-### Build
+### Download app
 
-`make`
+`go get github.com/netrixone/udig/cmd/udig`
+
+### Build from the sources
+
+`make` or `make install`
+
+This will also download the latest GeoIP database (IPLocation-lite).
 
 ### Usage
 
 ```bash
-udig [-h|--help] [-v|--version] [-V|--verbose] [--json] [-d|--domain
-            "<value>" [-d|--domain "<value>" ...]]
+udig [-h|--help] [-v|--version] [-V|--verbose] [--json] [-d|--domain "<value>"]
 
-            ÜberDig - dig on steroids v1.0 by stuchl4n3k
+            ÜberDig - dig on steroids v1.3 by stuchl4n3k
 
 Arguments:
 
