@@ -10,6 +10,7 @@ all: build test
 clean:
 		$(GOCMD) clean -i $(PACKAGE)
 		rm -f $(BINARY_NAME)
+		rm -f $(BINARY_NAME)_min
 		rm -f $(GEODB_NAME)
 
 build: deps
@@ -20,6 +21,10 @@ install: deps test
 ifneq (,$(wildcard $(GEODB_NAME)))
 		cp $(GEODB_NAME) "$(INSTALL_DIR)"
 endif
+
+release: deps test
+		$(GOCMD) build -ldflags="-s -w" -v -o $(BINARY_NAME)_min $(PACKAGE)
+		upx --brute $(BINARY_NAME)_min
 
 deps:
 		$(GOCMD) get -v -t ./...
