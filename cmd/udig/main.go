@@ -3,16 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"os"
+
 	"github.com/akamensky/argparse"
 	"github.com/miekg/dns"
 	"github.com/netrixone/udig"
-	"net/url"
-	"os"
 )
 
 const (
 	prog        = "udig"
-	version     = "1.3"
+	version     = "1.4"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )
@@ -103,6 +104,7 @@ func main() {
 	parser := argparse.NewParser(prog, description)
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
+	beStrict := parser.Flag("s", "strict", &argparse.Options{Required: false, Help: "Strict domain relation (TLD match)"})
 	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
 	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
 
@@ -124,6 +126,10 @@ func main() {
 		udig.LogLevel = udig.LogLevelDebug
 	} else {
 		udig.LogLevel = udig.LogLevelInfo
+	}
+
+	if *beStrict {
+		udig.IsDomainRelated = udig.StrictDomainRelation
 	}
 
 	outputJson = *jsonOutput

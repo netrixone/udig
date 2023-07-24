@@ -77,3 +77,85 @@ func Test_DissectDomainsFrom_By_invalid_domain(t *testing.T) {
 	assert.Len(t, domains, 1)
 	assert.Equal(t, "example.com", domains[0])
 }
+
+func Test_isDomainRelated_By_same_domain(t *testing.T) {
+	// Setup.
+	domainA := "example.com"
+	domainB := domainA
+
+	// Execute.
+	res1 := isDomainRelated(domainA, domainB, false)
+	res2 := isDomainRelated(domainB, domainA, false)
+
+	// Assert.
+	assert.Equal(t, true, res1)
+	assert.Equal(t, true, res2)
+}
+
+func Test_isDomainRelated_By_subdomain(t *testing.T) {
+	// Setup.
+	domainA := "example.com"
+	domainB := "sub.example.com"
+
+	// Execute.
+	res1 := isDomainRelated(domainA, domainB, false)
+	res2 := isDomainRelated(domainB, domainA, false)
+
+	// Assert.
+	assert.Equal(t, true, res1)
+	assert.Equal(t, true, res2)
+}
+
+func Test_isDomainRelated_By_domain_with_different_TLD(t *testing.T) {
+	// Setup.
+	domainA := "example.com"
+	domainB := "sub.example.net"
+
+	// Execute.
+	res1 := isDomainRelated(domainA, domainB, false)
+	res2 := isDomainRelated(domainB, domainA, false)
+
+	// Assert.
+	assert.Equal(t, true, res1)
+	assert.Equal(t, true, res2)
+}
+
+func Test_isDomainRelated_By_domain_with_different_TLD_strict(t *testing.T) {
+	// Setup.
+	domainA := "example.com"
+	domainB := "sub.example.net"
+
+	// Execute.
+	res1 := isDomainRelated(domainA, domainB, true)
+	res2 := isDomainRelated(domainB, domainA, true)
+
+	// Assert.
+	assert.Equal(t, false, res1)
+	assert.Equal(t, false, res2)
+}
+
+func Test_isDomainRelated_By_TLDs(t *testing.T) {
+	// Setup.
+	domainA := "com"
+	domainB := "com"
+
+	// Execute.
+	res := isDomainRelated(domainA, domainB, false)
+
+	// Assert.
+	assert.Equal(t, false, res)
+}
+
+func Test_isDomainRelated_By_invalid_domain(t *testing.T) {
+	// Setup.
+	domainA := "."
+	domainB := "example.com"
+
+	// Execute.
+	res1 := isDomainRelated(domainA, domainB, false)
+	res2 := isDomainRelated(domainB, domainA, false)
+
+	// Assert.
+	assert.Equal(t, false, res1)
+	assert.Equal(t, false, res2)
+}

@@ -27,9 +27,18 @@ const (
 )
 
 var (
-	domainPattern = regexp.MustCompile(_domain)
-	ipPattern     = regexp.MustCompile(_ip)
+	DefaultDomainRelation DomainRelationFn = func(domainA string, domainB string) bool {
+		return isDomainRelated(domainA, domainB, false)
+	}
+	StrictDomainRelation DomainRelationFn = func(domainA string, domainB string) bool {
+		return isDomainRelated(domainA, domainB, true)
+	}
+	IsDomainRelated = DefaultDomainRelation
+	domainPattern   = regexp.MustCompile(_domain)
+	ipPattern       = regexp.MustCompile(_ip)
 )
+
+type DomainRelationFn func(domainA string, domainB string) bool
 
 func init() {
 	domainPattern.Longest()
@@ -81,7 +90,7 @@ func cleanDomain(domain string) string {
 	return strings.ToLower(domain)
 }
 
-func isDomainRelated(domainA string, domainB string) bool {
+func isDomainRelated(domainA string, domainB string, strict bool) bool {
 	labelsA := dns.SplitDomainName(domainA)
 	labelsB := dns.SplitDomainName(domainB)
 
@@ -90,7 +99,10 @@ func isDomainRelated(domainA string, domainB string) bool {
 		return false
 	}
 
-	if len(labelsA) < 2 || len(labelsB) < 2 {
+	labelsALen := len(labelsA)
+	labelsBLen := len(labelsB)
+
+	if labelsALen < 2 || labelsBLen < 2 {
 		// Ignore TLDs.
 		return false
 	}
@@ -103,10 +115,12 @@ func isDomainRelated(domainA string, domainB string) bool {
 	//
 	// => Therefor we say the domains are related iff at least 2nd order domains are the same.
 
-	labelsALen := len(labelsA)
-	labelsBLen := len(labelsB)
-
-	return labelsA[labelsALen-2] == labelsB[labelsBLen-2]
+	related := labelsA[labelsALen-2] == labelsB[labelsBLen-2]
+	if related && strict {
+		// In strict mode we also require TLD match.
+		related = labelsA[labelsALen-1] == labelsB[labelsBLen-1]
+	}
+	return related
 }
 
 // reverseIPv4 returns a given IPv4 address in ARPA-like rDNS form.

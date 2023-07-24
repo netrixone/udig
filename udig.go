@@ -161,7 +161,7 @@ func (udig *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution)
 	}
 
 	// Otherwise try heuristics.
-	return isDomainRelated(nextDomain, resolution.Query())
+	return IsDomainRelated(nextDomain, resolution.Query())
 }
 
 func (udig *udigImpl) getRelatedDomains(resolutions []Resolution) (domains []string) {

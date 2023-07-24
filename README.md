@@ -88,15 +88,17 @@ This will also download the latest GeoIP database (IPLocation-lite).
 ### Usage
 
 ```bash
-udig [-h|--help] [-v|--version] [-V|--verbose] [--json] [-d|--domain "<value>"]
+udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict] [--json]
+            [-d|--domain "<value>" [-d|--domain "<value>" ...]]
 
-            ÜberDig - dig on steroids v1.3 by stuchl4n3k
+            ÜberDig - dig on steroids v1.4 by stuchl4n3k
 
 Arguments:
 
   -h  --help     Print help information
   -v  --version  Print version and exit
   -V  --verbose  Be more verbose
+  -s  --strict   Strict domain relation (TLD match)
       --json     Output payloads as JSON objects
   -d  --domain   Domain to resolve
 ```
