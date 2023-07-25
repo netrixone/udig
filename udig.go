@@ -1,8 +1,9 @@
 package udig
 
 import (
-	"github.com/miekg/dns"
 	"sync"
+
+	"github.com/miekg/dns"
 )
 
 type udigImpl struct {
@@ -39,17 +40,9 @@ func NewUdig() Udig {
 	return udig
 }
 
-func (udig *udigImpl) Resolve(domain string) (resolutions []Resolution) {
+func (udig *udigImpl) Resolve(domain string) []Resolution {
 	udig.domainQueue <- domain
-	resolutions = append(resolutions, udig.resolveDomains()...)
-
-	// Enqueue all discovered IPs.
-	for _, resolution := range resolutions {
-		udig.enqueueIps(resolution.IPs()...)
-	}
-	resolutions = append(resolutions, udig.resolveIPs()...)
-
-	return resolutions
+	return udig.resolveDomains()
 }
 
 func (udig *udigImpl) AddDomainResolver(resolver DomainResolver) {
@@ -73,6 +66,9 @@ func (udig *udigImpl) resolveDomains() (resolutions []Resolution) {
 
 		// Enqueue all related domains from the result.
 		udig.enqueueDomains(udig.getRelatedDomains(newResolutions)...)
+
+		// Resolve all the discovered IPs.
+		resolutions = append(resolutions, udig.resolveIPs()...)
 	}
 
 	return resolutions
@@ -106,7 +102,12 @@ func (udig *udigImpl) resolveOneDomain(domain string) (resolutions []Resolution)
 
 	for _, resolver := range udig.domainResolvers {
 		go func(resolver DomainResolver) {
-			resolutionChannel <- resolver.ResolveDomain(domain)
+			resolution := resolver.ResolveDomain(domain)
+			resolutionChannel <- resolution
+
+			// Enqueue all discovered IPs.
+			udig.enqueueIps(resolution.IPs()...)
+
 			wg.Done()
 		}(resolver)
 	}
