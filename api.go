@@ -2,10 +2,11 @@ package udig
 
 import (
 	"crypto/x509"
-	"github.com/domainr/whois"
-	"github.com/miekg/dns"
 	"net/http"
 	"time"
+
+	"github.com/domainr/whois"
+	"github.com/miekg/dns"
 )
 
 /////////////////////////////////////////
@@ -33,6 +34,9 @@ const (
 	// TypeHTTP is a type of all HTTP resolutions.
 	TypeHTTP ResolutionType = "HTTP"
 
+	// TypeCT is a type of all CT resolutions.
+	TypeCT ResolutionType = "CT"
+
 	// TypeBGP is a type of all BGP resolutions.
 	TypeBGP ResolutionType = "BGP"
 
@@ -41,7 +45,7 @@ const (
 )
 
 // Udig is a high-level facade for domain resolution which:
-// 	1. delegates work to specific resolvers
+//  1. delegates work to specific resolvers
 //  2. deals with domain crawling
 //  3. caches intermediate results and summarizes the outputs
 type Udig interface {
@@ -200,6 +204,43 @@ type HTTPResolution struct {
 type HTTPHeader struct {
 	Name  string
 	Value []string
+}
+
+/////////////////////////////////////////
+// CT
+/////////////////////////////////////////
+
+// CTResolver is a Resolver responsible for resolution of a given domain
+// to a list of CT logs.
+type CTResolver struct {
+	DomainResolver
+	Client        *http.Client
+	cachedResults map[string]*CTResolution
+}
+
+// CTResolution is a certificate transparency project resolution, which yields a CT log.
+type CTResolution struct {
+	*ResolutionBase
+	Logs []CTAggregatedLog
+}
+
+// CTAggregatedLog is a wrapper of a CT log that is aggregated over all logs
+// with the same CN in time.
+type CTAggregatedLog struct {
+	CTLog
+	FirstSeen string
+	LastSeen  string
+}
+
+// CTLog is a wrapper for attributes of interest that appear in the CT log.
+// The json mapping comes from crt.sh API schema.
+type CTLog struct {
+	Id         int64  `json:"id"`
+	IssuerName string `json:"issuer_name"`
+	NameValue  string `json:"name_value"`
+	LoggedAt   string `json:"entry_timestamp"`
+	NotBefore  string `json:"not_before"`
+	NotAfter   string `json:"not_after"`
 }
 
 /////////////////////////////////////////

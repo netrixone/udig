@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/akamensky/argparse"
 	"github.com/miekg/dns"
@@ -13,7 +14,7 @@ import (
 
 const (
 	prog        = "udig"
-	version     = "1.4"
+	version     = "1.5"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )
@@ -65,6 +66,12 @@ func resolve(domain string) {
 			}
 			break
 
+		case udig.TypeCT:
+			for _, ctLog := range (res).(*udig.CTResolution).Logs {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&ctLog))
+			}
+			break
+
 		case udig.TypeBGP:
 			for _, as := range (res).(*udig.BGPResolution).Records {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&as))
@@ -105,8 +112,18 @@ func main() {
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
 	beStrict := parser.Flag("s", "strict", &argparse.Options{Required: false, Help: "Strict domain relation (TLD match)"})
-	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
 	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
+	ctExpired := parser.Flag("", "ct:expired", &argparse.Options{Required: false, Help: "Collect expired CT logs"})
+	ctFrom := parser.String("", "ct:from", &argparse.Options{
+		Required: false,
+		Help:     "Date to collect logs from",
+		Default:  fmt.Sprintf("1 year ago (%s)", udig.CTLogFrom),
+		Validate: func(args []string) error {
+			_, err := time.Parse("2006-01-02", args[0])
+			return err
+		},
+	})
+	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
 
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -130,6 +147,14 @@ func main() {
 
 	if *beStrict {
 		udig.IsDomainRelated = udig.StrictDomainRelation
+	}
+
+	if *ctExpired {
+		udig.CTExclude = ""
+	}
+
+	if *ctFrom != "" {
+		udig.CTLogFrom = *ctFrom
 	}
 
 	outputJson = *jsonOutput

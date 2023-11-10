@@ -33,6 +33,7 @@ func NewUdig() Udig {
 	udig.AddDomainResolver(NewWhoisResolver())
 	udig.AddDomainResolver(NewTLSResolver())
 	udig.AddDomainResolver(NewHTTPResolver())
+	udig.AddDomainResolver(NewCTResolver())
 
 	udig.AddIPResolver(NewBGPResolver())
 	udig.AddIPResolver(NewGeoResolver())

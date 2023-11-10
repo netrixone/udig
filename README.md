@@ -23,7 +23,8 @@ Feature set:
 - [x] Unobtrusive human-readable CLI output as well as machine readable JSON
 - [x] Supports multiple domains on the input
 - [x] Colorized output
-- [x] Resolves domains in HTTP headers
+- [x] Parses domains in HTTP headers
+- [x] Parses domains in Certificate Transparency logs
 - [x] Parses IPs found in SPF record
 - [x] Looks up BGP AS for each discovered IP
 - [x] Looks up GeoIP record for each discovered IP
@@ -49,27 +50,27 @@ for _, res := range resolutions {
 ```
                                                          +------------+
                                                          |            |
-                                                  +------+    Udig    +------------+
-Delegates:                                        |      |            |            |
-                                                  |      +------------+            |
-                                                  |*                               |*
-                                      +------------------+                  +------------+
-                                      |  DomainResolver  |                  | IPResolver |
-             +----------------------> +------------------+                  +------------+
-             |                        ^      ^           ^                         ^     ^
-Implements:  |                  +-----+      |           |                         |     +-------+
-             |                  |            |           |                         |             |
-     +-------------+ +-------------+ +--------------+ +---------------+        +-------------+ +---------------+
-     | DNSResolver | | TLSResolver | | HTTPResolver | | WhoisResolver |        | BGPResolver | | GeoipResolver |
-     +-------------+ +-------------+ +--------------+ +---------------+        +-------------+ +---------------+
-             |              |                |               |                        |                |
-             |              |                |               |                        |                |
-Produces:    |              |                |               |                        |                |
-             |              |                |               |                        |                |
-             |*             |*               |*              |*                       |*               |*
-      +-----------+ +----------------+ +------------+ +--------------+           +----------+   +-------------+
-      | DNSRecord | | TLSCertificate | | HTTPHeader | | WhoisContact |           | ASRecord |   | GeoipRecord |
-      +-----------+ +----------------+ +------------+ +--------------+           +----------+   +-------------+
+                                                  +------+    Udig    +-----------------------------------+
+Delegates:                                        |      |            |                                   |
+                                                  |      +------------+                                   |
+                                                  |*                                                      |*
+                                      +------------------+                                           +------------+
+                                      |  DomainResolver  |                                           | IPResolver |
+             +----------------------> +------------------+ <------------------+                      +------------+
+             |                        ^      ^           ^                    |                         ^    ^
+Implements:  |                  +-----+      |           |                    |                         |    +-------+
+             |                  |            |           |                    |                         |            |
+     +-------------+ +-------------+ +--------------+ +---------------+ +------------+        +-------------+ +---------------+
+     | DNSResolver | | TLSResolver | | HTTPResolver | | WhoisResolver | | CTResolver |        | BGPResolver | | GeoipResolver |
+     +-------------+ +-------------+ +--------------+ +---------------+ +------------+        +-------------+ +---------------+
+             |              |                |               |             |                            |                |
+             |              |                |               |             |                            |                |
+Produces:    |              |                |               |             |                            |                |
+             |              |                |               |             |                            |                |
+             |*             |*               |*              |*            |*                           |*               |*
+      +-----------+ +----------------+ +------------+ +--------------+ +-------+                  +----------+   +-------------+
+      | DNSRecord | | TLSCertificate | | HTTPHeader | | WhoisContact | | CTLog |                  | ASRecord |   | GeoipRecord |
+      +-----------+ +----------------+ +------------+ +--------------+ +-------+                  +----------+   +-------------+
 
 ```
 
@@ -88,19 +89,22 @@ This will also download the latest GeoIP database (IPLocation-lite).
 ### Usage
 
 ```bash
-udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict] [--json]
-            [-d|--domain "<value>" [-d|--domain "<value>" ...]]
+udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
+            [-d|--domain "<value>"] [--ct:expired] [--ct:from "<value>"]
+            [--json]
 
-            ÜberDig - dig on steroids v1.4 by stuchl4n3k
+            ÜberDig - dig on steroids v1.5 by stuchl4n3k
 
 Arguments:
 
-  -h  --help     Print help information
-  -v  --version  Print version and exit
-  -V  --verbose  Be more verbose
-  -s  --strict   Strict domain relation (TLD match)
-      --json     Output payloads as JSON objects
-  -d  --domain   Domain to resolve
+  -h  --help        Print help information
+  -v  --version     Print version and exit
+  -V  --verbose     Be more verbose
+  -s  --strict      Strict domain relation (TLD match)
+  -d  --domain      Domain to resolve
+      --ct:expired  Collect expired CT logs
+      --ct:from     Date to collect logs from. Default: 1 year ago (2022-11-10)
+      --json        Output payloads as JSON objects
 ```
 
 ### Demo
