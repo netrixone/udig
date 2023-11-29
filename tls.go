@@ -119,5 +119,5 @@ func dissectDomainsFromCert(cert *TLSCertificate) (domains []string) {
 		haystack = append(haystack, uri.Host)
 	}
 
-	return dissectDomainsFromStrings(haystack)
+	return DissectDomainsFromStrings(haystack)
 }

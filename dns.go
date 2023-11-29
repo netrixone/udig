@@ -3,10 +3,11 @@ package udig
 import (
 	"errors"
 	"fmt"
-	"github.com/miekg/dns"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/miekg/dns"
 )
 
 var (
@@ -96,7 +97,7 @@ func dissectDomainsFromRecord(record dns.RR) (domains []string) {
 		break
 
 	case dns.TypeTXT:
-		domains = dissectDomainsFromStrings((record).(*dns.TXT).Txt)
+		domains = DissectDomainsFromStrings((record).(*dns.TXT).Txt)
 		break
 
 	case dns.TypeRRSIG:
@@ -113,7 +114,7 @@ func dissectDomainsFromRecord(record dns.RR) (domains []string) {
 	}
 
 	for i := range domains {
-		domains[i] = cleanDomain(domains[i])
+		domains[i] = CleanDomain(domains[i])
 	}
 
 	return domains
@@ -131,7 +132,7 @@ func dissectIPsFromRecord(record dns.RR) (ips []string) {
 
 	case dns.TypeTXT:
 		// For SPF typically.
-		ips = dissectIpsFromStrings((record).(*dns.TXT).Txt)
+		ips = DissectIpsFromStrings((record).(*dns.TXT).Txt)
 		break
 	}
 
@@ -225,10 +226,10 @@ func (resolver *DNSResolver) findNameServerFor(domain string) string {
 
 	if nameServer != "" {
 		// OK, NS found.
-	} else if isSubdomain(domain) {
+	} else if IsSubdomain(domain) {
 		// This is a subdomain -> try the parent.
 		LogDebug("%s: No NS found for subdomain %s -> trying parent domain.", TypeDNS, domain)
-		nameServer = resolver.findNameServerFor(parentDomainOf(domain))
+		nameServer = resolver.findNameServerFor(ParentDomainOf(domain))
 	} else {
 		// Fallback to local NS.
 		LogErr("%s: Could not resolve NS for domain %s -> falling back to local.", TypeDNS, domain)

@@ -1,13 +1,14 @@
 package udig
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_DissectDomainsFrom_By_simple_domain(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("example.com")
+	domains := DissectDomainsFromString("example.com")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -16,7 +17,7 @@ func Test_DissectDomainsFrom_By_simple_domain(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_subdomain(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("example.domain-hyphen.com")
+	domains := DissectDomainsFromString("example.domain-hyphen.com")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -25,7 +26,7 @@ func Test_DissectDomainsFrom_By_subdomain(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_www_subdomain(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("www.example.domain-hyphen.com")
+	domains := DissectDomainsFromString("www.example.domain-hyphen.com")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -34,7 +35,7 @@ func Test_DissectDomainsFrom_By_www_subdomain(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_exotic_tld(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("www.example.domain-hyphen.museum")
+	domains := DissectDomainsFromString("www.example.domain-hyphen.museum")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -43,7 +44,7 @@ func Test_DissectDomainsFrom_By_exotic_tld(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_complex_domain(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("external.asd1230-123.asd_internal.asd.gm-_ail.aero")
+	domains := DissectDomainsFromString("external.asd1230-123.asd_internal.asd.gm-_ail.aero")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -52,7 +53,7 @@ func Test_DissectDomainsFrom_By_complex_domain(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_complex_url_in_text(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("Hello world: https://user:password@external.asd1230-123.asd_internal.asd.gm-_ail.aero:8080/foo/bar.html is really cool\nURL")
+	domains := DissectDomainsFromString("Hello world: https://user:password@external.asd1230-123.asd_internal.asd.gm-_ail.aero:8080/foo/bar.html is really cool\nURL")
 
 	// Assert.
 	assert.Len(t, domains, 1)
@@ -61,7 +62,7 @@ func Test_DissectDomainsFrom_By_complex_url_in_text(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_multiple_urls(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("Hello world: https://user:password@external.asd1230-123.asd_internal.asd.gm-_ail.aero:8080/foo/bar.html is really cool\nURL and this is another one http://www.foo-bar_baz.co")
+	domains := DissectDomainsFromString("Hello world: https://user:password@external.asd1230-123.asd_internal.asd.gm-_ail.aero:8080/foo/bar.html is really cool\nURL and this is another one http://www.foo-bar_baz.co")
 
 	// Assert.
 	assert.Len(t, domains, 2)
@@ -71,7 +72,7 @@ func Test_DissectDomainsFrom_By_multiple_urls(t *testing.T) {
 
 func Test_DissectDomainsFrom_By_invalid_domain(t *testing.T) {
 	// Execute.
-	domains := dissectDomainsFromString("bad.-example.com")
+	domains := DissectDomainsFromString("bad.-example.com")
 
 	// Assert.
 	assert.Len(t, domains, 1)

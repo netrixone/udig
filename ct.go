@@ -72,7 +72,7 @@ func (resolver *CTResolver) cacheLookup(domain string) *CTResolution {
 	}
 
 	// Try parent domain as well (unless it is a 2nd order domain).
-	for ; domain != ""; domain = parentDomainOf(domain) {
+	for ; domain != ""; domain = ParentDomainOf(domain) {
 		resolution = resolver.cachedResults[domain]
 		if resolution != nil {
 			return resolution
@@ -180,7 +180,7 @@ func (log *CTAggregatedLog) String() string {
 /////////////////////////////////////////
 
 func (log *CTLog) ExtractDomains() (domains []string) {
-	domains = append(domains, dissectDomainsFromString(log.NameValue)...)
+	domains = append(domains, DissectDomainsFromString(log.NameValue)...)
 	return domains
 }
 

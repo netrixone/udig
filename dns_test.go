@@ -2,10 +2,11 @@ package udig
 
 import (
 	"errors"
-	"github.com/miekg/dns"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/miekg/dns"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *testing.T) {
@@ -266,7 +267,7 @@ func Test_parentDomainOf_By_subdomain(t *testing.T) {
 	domain := "sub.example.com"
 
 	// Execute.
-	parent := parentDomainOf(domain)
+	parent := ParentDomainOf(domain)
 
 	// Assert.
 	assert.Equal(t, "example.com", parent)
@@ -277,7 +278,7 @@ func Test_parentDomainOf_By_domain(t *testing.T) {
 	domain := "example.com"
 
 	// Execute.
-	parent := parentDomainOf(domain)
+	parent := ParentDomainOf(domain)
 
 	// Assert.
 	assert.Empty(t, parent)
@@ -288,7 +289,7 @@ func Test_parentDomainOf_By_TLD(t *testing.T) {
 	domain := "com"
 
 	// Execute.
-	parent := parentDomainOf(domain)
+	parent := ParentDomainOf(domain)
 
 	// Assert.
 	assert.Empty(t, parent)

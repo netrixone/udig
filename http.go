@@ -86,7 +86,7 @@ func (resolver *HTTPResolver) ResolveDomain(domain string) Resolution {
 	headers := fetchHeaders("https://" + domain)
 	for _, name := range resolver.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
-		if len(dissectDomainsFromStrings(value)) > 0 {
+		if len(DissectDomainsFromStrings(value)) > 0 {
 			resolution.Headers = append(resolution.Headers, HTTPHeader{name, value})
 		}
 	}
@@ -106,7 +106,7 @@ func (res *HTTPResolution) Type() ResolutionType {
 // Domains returns a list of domains discovered in records within this Resolution.
 func (res *HTTPResolution) Domains() (domains []string) {
 	for _, header := range res.Headers {
-		domains = append(domains, dissectDomainsFromStrings(header.Value)...)
+		domains = append(domains, DissectDomainsFromStrings(header.Value)...)
 	}
 	return domains
 }

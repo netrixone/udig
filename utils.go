@@ -1,10 +1,11 @@
 package udig
 
 import (
-	"github.com/miekg/dns"
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/miekg/dns"
 )
 
 const (
@@ -44,37 +45,37 @@ func init() {
 	domainPattern.Longest()
 }
 
-func dissectDomainsFromStrings(haystacks []string) (domains []string) {
+func DissectDomainsFromStrings(haystacks []string) (domains []string) {
 	for _, haystack := range haystacks {
-		domains = append(domains, dissectDomainsFromString(haystack)...)
+		domains = append(domains, DissectDomainsFromString(haystack)...)
 	}
 	return domains
 }
 
-func dissectDomainsFromString(haystack string) []string {
+func DissectDomainsFromString(haystack string) []string {
 	domains := domainPattern.FindAllString(haystack, -1)
 	for i := range domains {
-		domains[i] = cleanDomain(domains[i])
+		domains[i] = CleanDomain(domains[i])
 	}
 	return domains
 }
 
-func dissectIpsFromStrings(haystacks []string) (ips []string) {
+func DissectIpsFromStrings(haystacks []string) (ips []string) {
 	for _, haystack := range haystacks {
-		ips = append(ips, dissectIpsFromString(haystack)...)
+		ips = append(ips, DissectIpsFromString(haystack)...)
 	}
 	return ips
 }
 
-func dissectIpsFromString(haystack string) []string {
+func DissectIpsFromString(haystack string) []string {
 	return ipPattern.FindAllString(haystack, -1)
 }
 
-func isSubdomain(domain string) bool {
+func IsSubdomain(domain string) bool {
 	return dns.CountLabel(domain) >= 3
 }
 
-func parentDomainOf(domain string) string {
+func ParentDomainOf(domain string) string {
 	labels := strings.Split(domain, ".")
 	if len(labels) <= 2 {
 		// We don't want a TLD.
@@ -83,7 +84,7 @@ func parentDomainOf(domain string) string {
 	return strings.Join(labels[1:], ".")
 }
 
-func cleanDomain(domain string) string {
+func CleanDomain(domain string) string {
 	domain = strings.TrimSuffix(domain, ".")
 	domain = strings.TrimPrefix(domain, "*.")
 	domain = strings.TrimPrefix(domain, "www.")
