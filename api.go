@@ -154,11 +154,27 @@ type WhoisResolution struct {
 	Contacts []WhoisContact
 }
 
-// WhoisContact is just a set of key/value pairs.
-//
-// Note that all map keys are lowercase intentionally.
-// For a default list of supported properties refer to `udig.SupportedWhoisProperties`.
-type WhoisContact map[string]string
+// WhoisContact is a wrapper for any item of interest from a WHOIS banner.
+type WhoisContact struct {
+	RegistryDomainId        string
+	Registrant              string
+	RegistrantOrganization  string
+	RegistrantStateProvince string
+	RegistrantCountry       string
+	Registrar               string
+	RegistrarIanaId         string
+	RegistrarWhoisServer    string
+	RegistrarUrl            string
+	CreationDate            string
+	UpdatedDate             string
+	Registered              string
+	Changed                 string
+	Expire                  string
+	NSSet                   string
+	Contact                 string
+	Name                    string
+	Address                 string
+}
 
 /////////////////////////////////////////
 // TLS
