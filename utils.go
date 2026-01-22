@@ -34,9 +34,8 @@ var (
 	StrictDomainRelation DomainRelationFn = func(domainA string, domainB string) bool {
 		return isDomainRelated(domainA, domainB, true)
 	}
-	IsDomainRelated = DefaultDomainRelation
-	domainPattern   = regexp.MustCompile(_domain)
-	ipPattern       = regexp.MustCompile(_ip)
+	domainPattern = regexp.MustCompile(_domain)
+	ipPattern     = regexp.MustCompile(_ip)
 )
 
 type DomainRelationFn func(domainA string, domainB string) bool

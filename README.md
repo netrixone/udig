@@ -90,10 +90,10 @@ This will also download the latest GeoIP database (IPLocation-lite).
 
 ```bash
 udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
-            [-d|--domain "<value>"] [--ct:expired] [--ct:from "<value>"]
-            [--json]
+            [-d|--domain "<value>"] [-t|--timeout "<value>"] 
+            [--ct:expired] [--ct:from "<value>"] [--json]
 
-            ÜberDig - dig on steroids v1.5 by stuchl4n3k
+            ÜberDig - dig on steroids v1.6 by stuchl4n3k
 
 Arguments:
 
@@ -102,8 +102,9 @@ Arguments:
   -V  --verbose     Be more verbose
   -s  --strict      Strict domain relation (TLD match)
   -d  --domain      Domain to resolve
+  -t  --timeout     Connection timeout. Default: 10s
       --ct:expired  Collect expired CT logs
-      --ct:from     Date to collect logs from. Default: 1 year ago (2022-11-10)
+      --ct:from     Date to collect logs from in YYYY-MM-DD format. Default: 1 year ago (2025-01-22)
       --json        Output payloads as JSON objects
 ```
 

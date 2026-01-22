@@ -2,6 +2,7 @@ package udig
 
 import (
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -14,20 +15,28 @@ type udigImpl struct {
 	ipQueue         chan string
 	processed       map[string]bool
 	seen            map[string]bool
+
+	// Configurable:
+	isDomainRelated DomainRelationFn
+	timeout         time.Duration
+}
+
+type udigOption struct {
+	f func(*udigImpl)
+}
+
+func newUdigOption(f func(*udigImpl)) udigOption {
+	return udigOption{f}
+}
+
+func (opt udigOption) apply(udig *udigImpl) {
+	opt.f(udig)
 }
 
 // NewUdig creates a new Udig instances provisioned with
-// all supported resolvers. You can also supply your own
-// resolvers to the returned instance.
-func NewUdig() Udig {
-	udig := &udigImpl{
-		domainResolvers: []DomainResolver{},
-		ipResolvers:     []IPResolver{},
-		domainQueue:     make(chan string, 1024),
-		ipQueue:         make(chan string, 1024),
-		processed:       map[string]bool{},
-		seen:            map[string]bool{},
-	}
+// all supported resolvers.
+func NewUdig(opts ...Option) Udig {
+	udig := NewEmptyUdig(opts...)
 
 	udig.AddDomainResolver(NewDNSResolver())
 	udig.AddDomainResolver(NewWhoisResolver())
@@ -37,6 +46,29 @@ func NewUdig() Udig {
 
 	udig.AddIPResolver(NewBGPResolver())
 	udig.AddIPResolver(NewGeoResolver())
+
+	return udig
+}
+
+// NewUdig creates a new Udig instance without any resolvers.
+// You can also supply your own resolvers to the returned
+// instance.
+func NewEmptyUdig(opts ...Option) Udig {
+	udig := &udigImpl{
+		domainResolvers: []DomainResolver{},
+		ipResolvers:     []IPResolver{},
+		domainQueue:     make(chan string, 1024),
+		ipQueue:         make(chan string, 1024),
+		processed:       map[string]bool{},
+		seen:            map[string]bool{},
+
+		isDomainRelated: DefaultDomainRelation,
+		timeout:         DefaultTimeout,
+	}
+
+	for _, opt := range opts {
+		opt.apply(udig)
+	}
 
 	return udig
 }
@@ -163,7 +195,7 @@ func (udig *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution)
 	}
 
 	// Otherwise try heuristics.
-	return IsDomainRelated(nextDomain, resolution.Query())
+	return udig.isDomainRelated(nextDomain, resolution.Query())
 }
 
 func (udig *udigImpl) getRelatedDomains(resolutions []Resolution) (domains []string) {

@@ -15,7 +15,7 @@ import (
 
 const (
 	// DefaultTimeout is a default timeout used in all network clients.
-	DefaultTimeout = 3 * time.Second
+	DefaultTimeout = 10 * time.Second
 )
 
 // ResolutionType is an enumeration type for resolutions types.
@@ -94,6 +94,58 @@ func (res *ResolutionBase) Domains() (domains []string) {
 func (res *ResolutionBase) IPs() (ips []string) {
 	// Not supported by default.
 	return ips
+}
+
+// Option is a Udig configuration option pattern.
+type Option interface {
+	apply(*udigImpl)
+}
+
+// WithDebugLogging activates debug logging.
+func WithDebugLogging() Option {
+	return WithLoggingLevel(LogLevelDebug)
+}
+
+// WithDebugLogging activates debug logging.
+func WithLoggingLevel(logLevel int) Option {
+	return newUdigOption(func(opt *udigImpl) {
+		LogLevel = logLevel
+	})
+}
+
+// WithStrictMode activates strict mode domain relation (TLD match).
+func WithStrictMode() Option {
+	return WithDomainRelation(StrictDomainRelation)
+}
+
+// WithDomainRelation supplies a given domain relation func for domain heuristic.
+func WithDomainRelation(rel DomainRelationFn) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		if rel != nil {
+			udig.isDomainRelated = rel
+		}
+	})
+}
+
+// WithTimeout changes a default timeout to the supplied value.
+func WithTimeout(timeout time.Duration) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.timeout = timeout
+	})
+}
+
+// WithCTExpired includes expired Certificate Transparency logs in the results (slower).
+func WithCTExpired() Option {
+	return newUdigOption(func(udig *udigImpl) {
+		ctExclude = ""
+	})
+}
+
+// WithCTSince ignored Certificate Transparency logs older than a given time.
+func WithCTSince(t time.Time) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		ctSince = t.Format("2006-01-02")
+	})
 }
 
 /////////////////////////////////////////

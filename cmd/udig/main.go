@@ -14,7 +14,7 @@ import (
 
 const (
 	prog        = "udig"
-	version     = "1.5"
+	version     = "1.6"
 	author      = "stuchl4n3k"
 	description = "ÜberDig - dig on steroids v" + version + " by " + author
 )
@@ -30,14 +30,14 @@ var (
 )
 var outputJson = false
 
-func resolve(domain string) {
+func resolve(domain string, options []udig.Option) {
 	// Some input checks.
 	if !isValidDomain(domain) {
 		udig.LogErr("'%s' does not appear like a valid domain to me -> skipping.", domain)
 		return
 	}
 
-	dig := udig.NewUdig()
+	dig := udig.NewUdig(options...)
 	resolutions := dig.Resolve(domain)
 
 	for _, res := range resolutions {
@@ -113,11 +113,20 @@ func main() {
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
 	beStrict := parser.Flag("s", "strict", &argparse.Options{Required: false, Help: "Strict domain relation (TLD match)"})
 	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
+	timeout := parser.String("t", "timeout", &argparse.Options{
+		Required: false,
+		Help:     "Connection timeout",
+		Default:  udig.DefaultTimeout.String(),
+		Validate: func(args []string) error {
+			_, err := time.ParseDuration(args[0])
+			return err
+		},
+	})
 	ctExpired := parser.Flag("", "ct:expired", &argparse.Options{Required: false, Help: "Collect expired CT logs"})
 	ctFrom := parser.String("", "ct:from", &argparse.Options{
 		Required: false,
-		Help:     "Date to collect logs from",
-		Default:  fmt.Sprintf("1 year ago (%s)", udig.CTLogFrom),
+		Help:     "Date to collect logs from in YYYY-MM-DD format",
+		Default:  fmt.Sprintf("1 year ago (%s)", time.Now().AddDate(-1, 0, 0).Format("2006-01-02")),
 		Validate: func(args []string) error {
 			_, err := time.Parse("2006-01-02", args[0])
 			return err
@@ -139,26 +148,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	options := make([]udig.Option, 0)
 	if *beVerbose {
-		udig.LogLevel = udig.LogLevelDebug
-	} else {
-		udig.LogLevel = udig.LogLevelInfo
+		options = append(options, udig.WithDebugLogging())
 	}
 
 	if *beStrict {
-		udig.IsDomainRelated = udig.StrictDomainRelation
+		options = append(options, udig.WithStrictMode())
+	}
+
+	if *timeout != "" {
+		t, _ := time.ParseDuration(*timeout)
+		options = append(options, udig.WithTimeout(t))
 	}
 
 	if *ctExpired {
-		udig.CTExclude = ""
+		options = append(options, udig.WithCTExpired())
 	}
 
 	if *ctFrom != "" {
-		udig.CTLogFrom = *ctFrom
+		since, _ := time.Parse(*ctFrom, "2006-01-02")
+		options = append(options, udig.WithCTSince(since))
 	}
 
 	outputJson = *jsonOutput
 
 	fmt.Println(banner)
-	resolve(*domain)
+	resolve(*domain, options)
 }

@@ -17,8 +17,8 @@ import (
 const DefaultCTApiUrl = "https://crt.sh"
 
 var CTApiUrl = DefaultCTApiUrl
-var CTLogFrom = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
-var CTExclude = "expired"
+var ctSince = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+var ctExclude = "expired"
 
 // NewCTResolver creates a new CTResolver with sensible defaults.
 func NewCTResolver() *CTResolver {
@@ -83,7 +83,7 @@ func (resolver *CTResolver) cacheLookup(domain string) *CTResolution {
 }
 
 func (resolver *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
-	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, CTExclude, domain)
+	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, ctExclude, domain)
 	res, err := resolver.Client.Get(url)
 	if err != nil {
 		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
@@ -108,7 +108,7 @@ func (resolver *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 
 		// Skip logs outside of our time scope.
 		// @todo: maybe use a DB to query CRT.sh and filter the logs directly
-		if log.LoggedAt < CTLogFrom {
+		if log.LoggedAt < ctSince {
 			continue
 		}
 

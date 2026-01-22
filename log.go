@@ -21,7 +21,7 @@ const (
 )
 
 // LogLevel contains the actual log level setting.
-var LogLevel = LogLevelDebug
+var LogLevel = LogLevelInfo
 
 // LogPanic formats and prints a given log on STDERR and panics.
 func LogPanic(format string, a ...interface{}) {
