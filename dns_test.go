@@ -34,7 +34,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	}
 
 	// Setup.
-	resolver := NewDNSResolver()
+	resolver := NewDNSResolver(DefaultTimeout)
 
 	// Execute.
 	resolution := resolver.ResolveDomain("all.tens.ten").(*DNSResolution)
@@ -57,7 +57,7 @@ func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *
 	}
 
 	// Setup.
-	resolver := NewDNSResolver()
+	resolver := NewDNSResolver(DefaultTimeout)
 	resolver.NameServer = "1.1.1.1"
 
 	// Execute.
@@ -75,7 +75,7 @@ func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDNSResolver()
+	resolver := NewDNSResolver(DefaultTimeout)
 	resolver.QueryTypes = []uint16{dns.TypeA}
 
 	// Execute.
@@ -96,7 +96,7 @@ func Test_That_findNameServerFor_dissects_NS_records(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDNSResolver()
+	resolver := NewDNSResolver(DefaultTimeout)
 
 	// Execute.
 	nameServer := resolver.findNameServerFor("example.com")
@@ -123,7 +123,7 @@ func Test_That_findNameServerFor_caches_results(t *testing.T) {
 	}
 
 	// Setup.
-	resolver := NewDNSResolver()
+	resolver := NewDNSResolver(DefaultTimeout)
 
 	// Execute.
 	_ = resolver.findNameServerFor("example.com")
