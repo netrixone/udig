@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -145,26 +146,26 @@ func dissectIPsFromRecord(record dns.RR) (ips []string) {
 
 // NewDNSResolver creates a new DNS resolver instance pre-populated
 // with sensible defaults.
-func NewDNSResolver() *DNSResolver {
+func NewDNSResolver(timeout time.Duration) *DNSResolver {
 	return &DNSResolver{
 		QueryTypes:      DefaultDNSQueryTypes[:],
-		Client:          &dns.Client{ReadTimeout: DefaultTimeout},
+		Client:          &dns.Client{ReadTimeout: timeout},
 		nameServerCache: map[string]string{},
 		resolvedDomains: map[string]bool{},
 	}
 }
 
 // Type returns "DNS".
-func (resolver *DNSResolver) Type() ResolutionType {
+func (r *DNSResolver) Type() ResolutionType {
 	return TypeDNS
 }
 
 // ResolveDomain attempts to resolve a given domain for every DNS record
 // type defined in resolver.QueryTypes using either a user-supplied
 // name-server or dynamically resolved one for this domain.
-func (resolver *DNSResolver) ResolveDomain(domain string) Resolution {
+func (r *DNSResolver) ResolveDomain(domain string) Resolution {
 	// First find a name server for this domain (if not pre-defined).
-	nameServer := resolver.findNameServerFor(domain)
+	nameServer := r.findNameServerFor(domain)
 	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, nameServer, domain)
 
 	resolution := &DNSResolution{
@@ -175,11 +176,11 @@ func (resolver *DNSResolver) ResolveDomain(domain string) Resolution {
 	// Now do a DNS query for each record type (in parallel).
 	recordChannel := make(chan []DNSRecordPair, 128)
 	var wg sync.WaitGroup
-	wg.Add(len(resolver.QueryTypes))
+	wg.Add(len(r.QueryTypes))
 
-	for _, qType := range resolver.QueryTypes {
+	for _, qType := range r.QueryTypes {
 		go func(qType uint16) {
-			recordChannel <- resolver.resolveOne(domain, qType, nameServer)
+			recordChannel <- r.resolveOne(domain, qType, nameServer)
 			wg.Done()
 		}(qType)
 	}
@@ -193,8 +194,8 @@ func (resolver *DNSResolver) ResolveDomain(domain string) Resolution {
 	return resolution
 }
 
-func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) (answers []DNSRecordPair) {
-	msg, err := queryOneCallback(domain, qType, nameServer, resolver.Client)
+func (r *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) (answers []DNSRecordPair) {
+	msg, err := queryOneCallback(domain, qType, nameServer, r.Client)
 	if err != nil {
 		LogErr("%s: %s %s -> %s", TypeDNS, dns.TypeToString[qType], domain, err.Error())
 		return answers
@@ -210,26 +211,26 @@ func (resolver *DNSResolver) resolveOne(domain string, qType uint16, nameServer 
 	return answers
 }
 
-func (resolver *DNSResolver) findNameServerFor(domain string) string {
+func (r *DNSResolver) findNameServerFor(domain string) string {
 	// Use user-supplied NS if available.
-	if resolver.NameServer != "" {
-		return resolver.NameServer
+	if r.NameServer != "" {
+		return r.NameServer
 	}
 
 	// Check NS cache.
-	if resolver.nameServerCache[domain] != "" {
-		return resolver.nameServerCache[domain]
+	if r.nameServerCache[domain] != "" {
+		return r.nameServerCache[domain]
 	}
 
 	// Use DNS NS lookup.
-	nameServer := resolver.getNameServerFor(domain)
+	nameServer := r.getNameServerFor(domain)
 
 	if nameServer != "" {
 		// OK, NS found.
 	} else if IsSubdomain(domain) {
 		// This is a subdomain -> try the parent.
 		LogDebug("%s: No NS found for subdomain %s -> trying parent domain.", TypeDNS, domain)
-		nameServer = resolver.findNameServerFor(ParentDomainOf(domain))
+		nameServer = r.findNameServerFor(ParentDomainOf(domain))
 	} else {
 		// Fallback to local NS.
 		LogErr("%s: Could not resolve NS for domain %s -> falling back to local.", TypeDNS, domain)
@@ -237,16 +238,16 @@ func (resolver *DNSResolver) findNameServerFor(domain string) string {
 	}
 
 	// Cache the result.
-	resolver.nameServerCache[domain] = nameServer
+	r.nameServerCache[domain] = nameServer
 
 	return nameServer
 }
 
-func (resolver *DNSResolver) getNameServerFor(domain string) string {
+func (r *DNSResolver) getNameServerFor(domain string) string {
 	var nsRecord *dns.NS
 
 	// Do a NS query.
-	msg, err := queryOneCallback(domain, dns.TypeNS, localNameServer, resolver.Client)
+	msg, err := queryOneCallback(domain, dns.TypeNS, localNameServer, r.Client)
 	if err != nil {
 		LogErr("%s: %s %s -> %s", TypeDNS, "NS", domain, err.Error())
 	} else {
@@ -274,21 +275,21 @@ func (resolver *DNSResolver) getNameServerFor(domain string) string {
 /////////////////////////////////////////
 
 // Type returns "DNS".
-func (res *DNSResolution) Type() ResolutionType {
+func (r *DNSResolution) Type() ResolutionType {
 	return TypeDNS
 }
 
 // Domains returns a list of domains discovered in records within this Resolution.
-func (res *DNSResolution) Domains() (domains []string) {
-	for _, answer := range res.Records {
+func (r *DNSResolution) Domains() (domains []string) {
+	for _, answer := range r.Records {
 		domains = append(domains, dissectDomainsFromRecord(answer.Record.RR)...)
 	}
 	return domains
 }
 
 // IPs returns a list of IP addresses discovered in this resolution.
-func (res *DNSResolution) IPs() (ips []string) {
-	for _, answer := range res.Records {
+func (r *DNSResolution) IPs() (ips []string) {
+	for _, answer := range r.Records {
 		ips = append(ips, dissectIPsFromRecord(answer.Record.RR)...)
 	}
 	return ips
@@ -298,9 +299,9 @@ func (res *DNSResolution) IPs() (ips []string) {
 // DNS RECORD
 /////////////////////////////////////////
 
-func (record *DNSRecord) String() string {
+func (r *DNSRecord) String() string {
 	return fmt.Sprintf("%s %s",
-		dns.TypeToString[record.RR.Header().Rrtype],
-		strings.Replace(record.RR.String(), record.RR.Header().String(), "", 1),
+		dns.TypeToString[r.RR.Header().Rrtype],
+		strings.Replace(r.RR.String(), r.RR.Header().String(), "", 1),
 	)
 }

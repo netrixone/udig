@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 )
 
 var (
@@ -50,20 +51,19 @@ func fetchHeaders(url string) http.Header {
 /////////////////////////////////////////
 
 // NewHTTPResolver creates a new HTTPResolver with sensible defaults.
-func NewHTTPResolver() *HTTPResolver {
+func NewHTTPResolver(timeout time.Duration) *HTTPResolver {
 	transport := http.DefaultTransport.(*http.Transport)
 
 	transport.DialContext = (&net.Dialer{
-		Timeout:   DefaultTimeout,
-		KeepAlive: DefaultTimeout,
+		Timeout: timeout,
 	}).DialContext
 
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = DefaultTimeout
+	transport.TLSHandshakeTimeout = timeout
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   DefaultTimeout,
+		Timeout:   timeout,
 	}
 
 	return &HTTPResolver{
@@ -73,18 +73,18 @@ func NewHTTPResolver() *HTTPResolver {
 }
 
 // Type returns "HTTP".
-func (resolver *HTTPResolver) Type() ResolutionType {
+func (r *HTTPResolver) Type() ResolutionType {
 	return TypeHTTP
 }
 
 // ResolveDomain resolves a given domain to a list of corresponding HTTP headers.
-func (resolver *HTTPResolver) ResolveDomain(domain string) Resolution {
+func (r *HTTPResolver) ResolveDomain(domain string) Resolution {
 	resolution := &HTTPResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
 	headers := fetchHeaders("https://" + domain)
-	for _, name := range resolver.Headers {
+	for _, name := range r.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
 		if len(DissectDomainsFromStrings(value)) > 0 {
 			resolution.Headers = append(resolution.Headers, HTTPHeader{name, value})
@@ -99,13 +99,13 @@ func (resolver *HTTPResolver) ResolveDomain(domain string) Resolution {
 /////////////////////////////////////////
 
 // Type returns "HTTP".
-func (res *HTTPResolution) Type() ResolutionType {
+func (r *HTTPResolution) Type() ResolutionType {
 	return TypeHTTP
 }
 
 // Domains returns a list of domains discovered in records within this Resolution.
-func (res *HTTPResolution) Domains() (domains []string) {
-	for _, header := range res.Headers {
+func (r *HTTPResolution) Domains() (domains []string) {
+	for _, header := range r.Headers {
 		domains = append(domains, DissectDomainsFromStrings(header.Value)...)
 	}
 	return domains
@@ -115,6 +115,6 @@ func (res *HTTPResolution) Domains() (domains []string) {
 // HTTP HEADER
 /////////////////////////////////////////
 
-func (header *HTTPHeader) String() string {
-	return fmt.Sprintf("%s: %v", header.Name, header.Value)
+func (h *HTTPHeader) String() string {
+	return fmt.Sprintf("%s: %v", h.Name, h.Value)
 }

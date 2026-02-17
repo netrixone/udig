@@ -1,7 +1,6 @@
 package udig
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,20 +20,18 @@ var ctSince = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
 var ctExclude = "expired"
 
 // NewCTResolver creates a new CTResolver with sensible defaults.
-func NewCTResolver() *CTResolver {
+func NewCTResolver(timeout time.Duration) *CTResolver {
 	transport := http.DefaultTransport.(*http.Transport)
 
 	transport.DialContext = (&net.Dialer{
-		Timeout:   DefaultTimeout,
-		KeepAlive: DefaultTimeout,
+		Timeout: timeout,
 	}).DialContext
 
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = DefaultTimeout
+	transport.TLSHandshakeTimeout = timeout
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   DefaultTimeout,
+		Timeout:   timeout,
 	}
 
 	return &CTResolver{
@@ -44,36 +41,36 @@ func NewCTResolver() *CTResolver {
 }
 
 // Type returns "CT".
-func (resolver *CTResolver) Type() ResolutionType {
+func (r *CTResolver) Type() ResolutionType {
 	return TypeCT
 }
 
 // ResolveDomain resolves a given domain to a list of TLS certificates.
-func (resolver *CTResolver) ResolveDomain(domain string) Resolution {
+func (r *CTResolver) ResolveDomain(domain string) Resolution {
 	resolution := &CTResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
-	if cached := resolver.cacheLookup(domain); cached != nil {
+	if cached := r.cacheLookup(domain); cached != nil {
 		// Ignore, otherwise the output would burn without adding no/little value.
 		return resolution
 	}
 
-	resolution.Logs = resolver.fetchLogs(domain)
-	resolver.cachedResults[domain] = resolution
+	resolution.Logs = r.fetchLogs(domain)
+	r.cachedResults[domain] = resolution
 
 	return resolution
 }
 
-func (resolver *CTResolver) cacheLookup(domain string) *CTResolution {
-	resolution := resolver.cachedResults[domain]
+func (r *CTResolver) cacheLookup(domain string) *CTResolution {
+	resolution := r.cachedResults[domain]
 	if resolution != nil {
 		return resolution
 	}
 
 	// Try parent domain as well (unless it is a 2nd order domain).
 	for ; domain != ""; domain = ParentDomainOf(domain) {
-		resolution = resolver.cachedResults[domain]
+		resolution = r.cachedResults[domain]
 		if resolution != nil {
 			return resolution
 		}
@@ -82,9 +79,9 @@ func (resolver *CTResolver) cacheLookup(domain string) *CTResolution {
 	return nil
 }
 
-func (resolver *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
+func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, ctExclude, domain)
-	res, err := resolver.Client.Get(url)
+	res, err := r.Client.Get(url)
 	if err != nil {
 		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
 		return logs
@@ -143,15 +140,15 @@ func (resolver *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 /////////////////////////////////////////
 
 // Type returns "CT".
-func (res *CTResolution) Type() ResolutionType {
+func (r *CTResolution) Type() ResolutionType {
 	return TypeCT
 }
 
 // Domains returns a list of domains discovered in records within this Resolution.
-func (res *CTResolution) Domains() (domains []string) {
+func (r *CTResolution) Domains() (domains []string) {
 	seen := make(map[string]bool, 0)
 
-	for _, log := range res.Logs {
+	for _, log := range r.Logs {
 		logDomains := log.ExtractDomains()
 		for _, domain := range logDomains {
 			if !seen[domain] {
@@ -168,10 +165,10 @@ func (res *CTResolution) Domains() (domains []string) {
 // CT AGGREGATED LOG
 /////////////////////////////////////////
 
-func (log *CTAggregatedLog) String() string {
+func (l *CTAggregatedLog) String() string {
 	return fmt.Sprintf(
 		"name: %s, first_seen: %s, last_seen: %s, not_before: %s, not_after: %s, issuer: %s",
-		log.NameValue, log.FirstSeen, log.LastSeen, log.NotBefore, log.NotAfter, log.IssuerName,
+		l.NameValue, l.FirstSeen, l.LastSeen, l.NotBefore, l.NotAfter, l.IssuerName,
 	)
 }
 
@@ -179,14 +176,14 @@ func (log *CTAggregatedLog) String() string {
 // CT LOG
 /////////////////////////////////////////
 
-func (log *CTLog) ExtractDomains() (domains []string) {
-	domains = append(domains, DissectDomainsFromString(log.NameValue)...)
+func (l *CTLog) ExtractDomains() (domains []string) {
+	domains = append(domains, DissectDomainsFromString(l.NameValue)...)
 	return domains
 }
 
-func (log *CTLog) String() string {
+func (l *CTLog) String() string {
 	return fmt.Sprintf(
 		"name: %s, logged_at: %s, not_before: %s, not_after: %s, issuer: %s",
-		log.NameValue, log.LoggedAt, log.NotBefore, log.NotAfter, log.IssuerName,
+		l.NameValue, l.LoggedAt, l.NotBefore, l.NotAfter, l.IssuerName,
 	)
 }

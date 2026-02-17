@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var (
@@ -129,30 +130,30 @@ func parseASName(asRecord string) string {
 /////////////////////////////////////////
 
 // NewBGPResolver creates a new BGPResolver with sensible defaults.
-func NewBGPResolver() *BGPResolver {
+func NewBGPResolver(timeout time.Duration) *BGPResolver {
 	return &BGPResolver{
-		Client:        &dns.Client{ReadTimeout: DefaultTimeout},
+		Client:        &dns.Client{ReadTimeout: timeout},
 		cachedResults: map[string]*BGPResolution{},
 	}
 }
 
 // ResolveIP resolves a given IP address to a list of corresponding AS records.
-func (resolver *BGPResolver) ResolveIP(ip string) Resolution {
-	resolution := resolver.cachedResults[ip]
+func (r *BGPResolver) ResolveIP(ip string) Resolution {
+	resolution := r.cachedResults[ip]
 	if resolution != nil {
 		return resolution
 	}
 	resolution = &BGPResolution{ResolutionBase: &ResolutionBase{query: ip}}
-	resolver.cachedResults[ip] = resolution
+	r.cachedResults[ip] = resolution
 
-	results := lookupASN(ip, resolver.Client)
+	results := lookupASN(ip, r.Client)
 	for _, result := range results {
 		asRecord := parseASNRecord(result)
 		if asRecord == nil {
 			continue
 		}
 
-		asRecord.Name = parseASName(lookupAS(asRecord.ASN, resolver.Client))
+		asRecord.Name = parseASName(lookupAS(asRecord.ASN, r.Client))
 		resolution.Records = append(resolution.Records, *asRecord)
 	}
 
@@ -160,7 +161,7 @@ func (resolver *BGPResolver) ResolveIP(ip string) Resolution {
 }
 
 // Type returns "BGP".
-func (resolver *BGPResolver) Type() ResolutionType {
+func (r *BGPResolver) Type() ResolutionType {
 	return TypeBGP
 }
 
@@ -169,7 +170,7 @@ func (resolver *BGPResolver) Type() ResolutionType {
 /////////////////////////////////////////
 
 // Type returns "BGP".
-func (res *BGPResolution) Type() ResolutionType {
+func (r *BGPResolution) Type() ResolutionType {
 	return TypeBGP
 }
 
@@ -177,9 +178,9 @@ func (res *BGPResolution) Type() ResolutionType {
 // AS RECORD
 /////////////////////////////////////////
 
-func (record *ASRecord) String() string {
+func (r *ASRecord) String() string {
 	return fmt.Sprintf(
 		"ASN: %d, AS: %s, prefix: %s, registry: %s, allocated: %s",
-		record.ASN, record.Name, record.BGPPrefix, record.Registry, record.Allocated,
+		r.ASN, r.Name, r.BGPPrefix, r.Registry, r.Allocated,
 	)
 }

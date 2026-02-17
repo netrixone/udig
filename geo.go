@@ -84,15 +84,15 @@ func NewGeoResolver() *GeoResolver {
 }
 
 // ResolveIP resolves a given IP address to a corresponding GeoIP record.
-func (resolver *GeoResolver) ResolveIP(ip string) Resolution {
-	resolution := resolver.cachedResults[ip]
+func (r *GeoResolver) ResolveIP(ip string) Resolution {
+	resolution := r.cachedResults[ip]
 	if resolution != nil {
 		return resolution
 	}
 	resolution = &GeoResolution{ResolutionBase: &ResolutionBase{query: ip}}
-	resolver.cachedResults[ip] = resolution
+	r.cachedResults[ip] = resolution
 
-	if !resolver.enabled {
+	if !r.enabled {
 		return resolution
 	}
 
@@ -106,7 +106,7 @@ func (resolver *GeoResolver) ResolveIP(ip string) Resolution {
 }
 
 // Type returns "GEO".
-func (resolver *GeoResolver) Type() ResolutionType {
+func (r *GeoResolver) Type() ResolutionType {
 	return TypeGEO
 }
 
@@ -115,7 +115,7 @@ func (resolver *GeoResolver) Type() ResolutionType {
 /////////////////////////////////////////
 
 // Type returns "BGP".
-func (res *GeoResolution) Type() ResolutionType {
+func (r *GeoResolution) Type() ResolutionType {
 	return TypeGEO
 }
 
@@ -123,6 +123,6 @@ func (res *GeoResolution) Type() ResolutionType {
 // GEO RECORD
 /////////////////////////////////////////
 
-func (record *GeoRecord) String() string {
-	return fmt.Sprintf("country code: %s", record.CountryCode)
+func (r *GeoRecord) String() string {
+	return fmt.Sprintf("country code: %s", r.CountryCode)
 }

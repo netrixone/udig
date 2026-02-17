@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 )
 
 /////////////////////////////////////////
@@ -13,21 +14,19 @@ import (
 /////////////////////////////////////////
 
 // NewTLSResolver creates a new TLSResolver with sensible defaults.
-func NewTLSResolver() *TLSResolver {
+func NewTLSResolver(timeout time.Duration) *TLSResolver {
 	transport := http.DefaultTransport.(*http.Transport)
 
 	transport.DialContext = (&net.Dialer{
-		Timeout:   DefaultTimeout,
-		KeepAlive: DefaultTimeout,
-		DualStack: true,
+		Timeout: timeout,
 	}).DialContext
 
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = DefaultTimeout
+	transport.TLSHandshakeTimeout = timeout
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   DefaultTimeout,
+		Timeout:   timeout,
 	}
 
 	return &TLSResolver{
@@ -36,17 +35,17 @@ func NewTLSResolver() *TLSResolver {
 }
 
 // Type returns "TLS".
-func (resolver *TLSResolver) Type() ResolutionType {
+func (r *TLSResolver) Type() ResolutionType {
 	return TypeTLS
 }
 
 // ResolveDomain resolves a given domain to a list of TLS certificates.
-func (resolver *TLSResolver) ResolveDomain(domain string) Resolution {
+func (r *TLSResolver) ResolveDomain(domain string) Resolution {
 	resolution := &TLSResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
-	certificates := resolver.fetchTLSCertChain(domain)
+	certificates := r.fetchTLSCertChain(domain)
 	for _, cert := range certificates {
 		resolution.Certificates = append(resolution.Certificates, TLSCertificate{*cert})
 	}
@@ -54,8 +53,8 @@ func (resolver *TLSResolver) ResolveDomain(domain string) Resolution {
 	return resolution
 }
 
-func (resolver *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Certificate) {
-	res, err := resolver.Client.Get("https://" + domain)
+func (r *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Certificate) {
+	res, err := r.Client.Get("https://" + domain)
 	if err != nil {
 		LogErr("%s: %s -> %s", TypeTLS, domain, err.Error())
 		return chain
@@ -74,13 +73,13 @@ func (resolver *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Cer
 /////////////////////////////////////////
 
 // Type returns "TLS".
-func (res *TLSResolution) Type() ResolutionType {
+func (r *TLSResolution) Type() ResolutionType {
 	return TypeTLS
 }
 
 // Domains returns a list of domains discovered in records within this Resolution.
-func (res *TLSResolution) Domains() (domains []string) {
-	for _, cert := range res.Certificates {
+func (r *TLSResolution) Domains() (domains []string) {
+	for _, cert := range r.Certificates {
 		domains = append(domains, dissectDomainsFromCert(&cert)...)
 	}
 	return domains
@@ -90,16 +89,16 @@ func (res *TLSResolution) Domains() (domains []string) {
 // TLS CERTIFICATE
 /////////////////////////////////////////
 
-func (cert *TLSCertificate) String() string {
-	subject := cert.Subject.CommonName
+func (c *TLSCertificate) String() string {
+	subject := c.Subject.CommonName
 	if subject == "" {
-		subject = cert.Subject.String()
+		subject = c.Subject.String()
 	}
-	issuer := cert.Issuer.CommonName
+	issuer := c.Issuer.CommonName
 	if issuer == "" {
-		issuer = cert.Issuer.String()
+		issuer = c.Issuer.String()
 	}
-	return fmt.Sprintf("subject: %s, issuer: %s, domains: %v", subject, issuer, cert.DNSNames)
+	return fmt.Sprintf("subject: %s, issuer: %s, domains: %v", subject, issuer, c.DNSNames)
 }
 
 func dissectDomainsFromCert(cert *TLSCertificate) (domains []string) {

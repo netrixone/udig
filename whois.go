@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/domainr/whois"
 )
@@ -129,20 +130,20 @@ func setOrAppendString(target *string, value string) {
 
 // NewWhoisResolver creates a new WhoisResolver instance provisioned
 // with sensible defaults.
-func NewWhoisResolver() *WhoisResolver {
+func NewWhoisResolver(timeout time.Duration) *WhoisResolver {
 	return &WhoisResolver{
-		Client: whois.NewClient(DefaultTimeout),
+		Client: whois.NewClient(timeout),
 	}
 }
 
 // Type returns "WHOIS".
-func (resolver *WhoisResolver) Type() ResolutionType {
+func (r *WhoisResolver) Type() ResolutionType {
 	return TypeWHOIS
 }
 
 // ResolveDomain attempts to resolve a given domain using WHOIS query
 // yielding a list of WHOIS contacts.
-func (resolver *WhoisResolver) ResolveDomain(domain string) Resolution {
+func (r *WhoisResolver) ResolveDomain(domain string) Resolution {
 	resolution := &WhoisResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
@@ -154,7 +155,7 @@ func (resolver *WhoisResolver) ResolveDomain(domain string) Resolution {
 		return resolution
 	}
 
-	response, err := resolver.Client.Fetch(request)
+	response, err := r.Client.Fetch(request)
 	if err != nil {
 		LogErr("%s: %s -> %s", TypeWHOIS, domain, err.Error())
 		return resolution
@@ -173,13 +174,13 @@ func (resolver *WhoisResolver) ResolveDomain(domain string) Resolution {
 /////////////////////////////////////////
 
 // Type returns "WHOIS".
-func (res *WhoisResolution) Type() ResolutionType {
+func (r *WhoisResolution) Type() ResolutionType {
 	return TypeWHOIS
 }
 
 // Domains returns a list of domains discovered in records within this Resolution.
-func (res *WhoisResolution) Domains() (domains []string) {
-	for _, contact := range res.Contacts {
+func (r *WhoisResolution) Domains() (domains []string) {
+	for _, contact := range r.Contacts {
 		domains = append(domains, DissectDomainsFromString(contact.RegistryDomainId)...)
 		domains = append(domains, DissectDomainsFromString(contact.Registrant)...)
 		domains = append(domains, DissectDomainsFromString(contact.RegistrantOrganization)...)
@@ -206,83 +207,83 @@ func (res *WhoisResolution) Domains() (domains []string) {
 // WHOIS CONTACT
 /////////////////////////////////////////
 
-func (contact *WhoisContact) IsEmpty() bool {
-	return contact.RegistryDomainId == "" &&
-		contact.Registrant == "" &&
-		contact.RegistrantOrganization == "" &&
-		contact.RegistrantStateProvince == "" &&
-		contact.RegistrantCountry == "" &&
-		contact.Registrar == "" &&
-		contact.RegistrarIanaId == "" &&
-		contact.RegistrarWhoisServer == "" &&
-		contact.RegistrarUrl == "" &&
-		contact.CreationDate == "" &&
-		contact.UpdatedDate == "" &&
-		contact.Registered == "" &&
-		contact.Changed == "" &&
-		contact.Expire == "" &&
-		contact.NSSet == "" &&
-		contact.Contact == "" &&
-		contact.Name == "" &&
-		contact.Address == ""
+func (c *WhoisContact) IsEmpty() bool {
+	return c.RegistryDomainId == "" &&
+		c.Registrant == "" &&
+		c.RegistrantOrganization == "" &&
+		c.RegistrantStateProvince == "" &&
+		c.RegistrantCountry == "" &&
+		c.Registrar == "" &&
+		c.RegistrarIanaId == "" &&
+		c.RegistrarWhoisServer == "" &&
+		c.RegistrarUrl == "" &&
+		c.CreationDate == "" &&
+		c.UpdatedDate == "" &&
+		c.Registered == "" &&
+		c.Changed == "" &&
+		c.Expire == "" &&
+		c.NSSet == "" &&
+		c.Contact == "" &&
+		c.Name == "" &&
+		c.Address == ""
 }
 
-func (contact *WhoisContact) String() string {
+func (c *WhoisContact) String() string {
 	var entries []string
 
-	if contact.RegistryDomainId != "" {
-		entries = append(entries, "registry domain id: "+contact.RegistryDomainId)
+	if c.RegistryDomainId != "" {
+		entries = append(entries, "registry domain id: "+c.RegistryDomainId)
 	}
-	if contact.Registrant != "" {
-		entries = append(entries, "registrant: "+contact.Registrant)
+	if c.Registrant != "" {
+		entries = append(entries, "registrant: "+c.Registrant)
 	}
-	if contact.RegistrantOrganization != "" {
-		entries = append(entries, "registrant organization: "+contact.RegistrantOrganization)
+	if c.RegistrantOrganization != "" {
+		entries = append(entries, "registrant organization: "+c.RegistrantOrganization)
 	}
-	if contact.RegistrantStateProvince != "" {
-		entries = append(entries, "registrant state/province: "+contact.RegistrantStateProvince)
+	if c.RegistrantStateProvince != "" {
+		entries = append(entries, "registrant state/province: "+c.RegistrantStateProvince)
 	}
-	if contact.RegistrantCountry != "" {
-		entries = append(entries, "registrant country: "+contact.RegistrantCountry)
+	if c.RegistrantCountry != "" {
+		entries = append(entries, "registrant country: "+c.RegistrantCountry)
 	}
-	if contact.Registrar != "" {
-		entries = append(entries, "registrar: "+contact.Registrar)
+	if c.Registrar != "" {
+		entries = append(entries, "registrar: "+c.Registrar)
 	}
-	if contact.RegistrarIanaId != "" {
-		entries = append(entries, "registrar iana id: "+contact.RegistrarIanaId)
+	if c.RegistrarIanaId != "" {
+		entries = append(entries, "registrar iana id: "+c.RegistrarIanaId)
 	}
-	if contact.RegistrarWhoisServer != "" {
-		entries = append(entries, "registrar whois server: "+contact.RegistrarWhoisServer)
+	if c.RegistrarWhoisServer != "" {
+		entries = append(entries, "registrar whois server: "+c.RegistrarWhoisServer)
 	}
-	if contact.RegistrarUrl != "" {
-		entries = append(entries, "registrar url: "+contact.RegistrarUrl)
+	if c.RegistrarUrl != "" {
+		entries = append(entries, "registrar url: "+c.RegistrarUrl)
 	}
-	if contact.CreationDate != "" {
-		entries = append(entries, "creation date: "+contact.CreationDate)
+	if c.CreationDate != "" {
+		entries = append(entries, "creation date: "+c.CreationDate)
 	}
-	if contact.UpdatedDate != "" {
-		entries = append(entries, "updated date: "+contact.UpdatedDate)
+	if c.UpdatedDate != "" {
+		entries = append(entries, "updated date: "+c.UpdatedDate)
 	}
-	if contact.Registered != "" {
-		entries = append(entries, "registered: "+contact.Registered)
+	if c.Registered != "" {
+		entries = append(entries, "registered: "+c.Registered)
 	}
-	if contact.Changed != "" {
-		entries = append(entries, "changed: "+contact.Changed)
+	if c.Changed != "" {
+		entries = append(entries, "changed: "+c.Changed)
 	}
-	if contact.Expire != "" {
-		entries = append(entries, "expire: "+contact.Expire)
+	if c.Expire != "" {
+		entries = append(entries, "expire: "+c.Expire)
 	}
-	if contact.NSSet != "" {
-		entries = append(entries, "nsset: "+contact.NSSet)
+	if c.NSSet != "" {
+		entries = append(entries, "nsset: "+c.NSSet)
 	}
-	if contact.Contact != "" {
-		entries = append(entries, "contact: "+contact.Contact)
+	if c.Contact != "" {
+		entries = append(entries, "c: "+c.Contact)
 	}
-	if contact.Name != "" {
-		entries = append(entries, "name: "+contact.Name)
+	if c.Name != "" {
+		entries = append(entries, "name: "+c.Name)
 	}
-	if contact.Address != "" {
-		entries = append(entries, "address: "+contact.Address)
+	if c.Address != "" {
+		entries = append(entries, "address: "+c.Address)
 	}
 
 	return strings.Join(entries, ", ")

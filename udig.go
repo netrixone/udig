@@ -8,7 +8,6 @@ import (
 )
 
 type udigImpl struct {
-	Udig
 	domainResolvers []DomainResolver
 	ipResolvers     []IPResolver
 	domainQueue     chan string
@@ -36,15 +35,15 @@ func (opt udigOption) apply(udig *udigImpl) {
 // NewUdig creates a new Udig instances provisioned with
 // all supported resolvers.
 func NewUdig(opts ...Option) Udig {
-	udig := NewEmptyUdig(opts...)
+	udig := newUdigIml(opts...)
 
-	udig.AddDomainResolver(NewDNSResolver())
-	udig.AddDomainResolver(NewWhoisResolver())
-	udig.AddDomainResolver(NewTLSResolver())
-	udig.AddDomainResolver(NewHTTPResolver())
-	udig.AddDomainResolver(NewCTResolver())
+	udig.AddDomainResolver(NewDNSResolver(udig.timeout))
+	udig.AddDomainResolver(NewWhoisResolver(udig.timeout))
+	udig.AddDomainResolver(NewTLSResolver(udig.timeout))
+	udig.AddDomainResolver(NewHTTPResolver(udig.timeout))
+	udig.AddDomainResolver(NewCTResolver(udig.timeout))
 
-	udig.AddIPResolver(NewBGPResolver())
+	udig.AddIPResolver(NewBGPResolver(udig.timeout))
 	udig.AddIPResolver(NewGeoResolver())
 
 	return udig
@@ -54,6 +53,10 @@ func NewUdig(opts ...Option) Udig {
 // You can also supply your own resolvers to the returned
 // instance.
 func NewEmptyUdig(opts ...Option) Udig {
+	return newUdigIml(opts...)
+}
+
+func newUdigIml(opts ...Option) *udigImpl {
 	udig := &udigImpl{
 		domainResolvers: []DomainResolver{},
 		ipResolvers:     []IPResolver{},
@@ -73,47 +76,47 @@ func NewEmptyUdig(opts ...Option) Udig {
 	return udig
 }
 
-func (udig *udigImpl) Resolve(domain string) []Resolution {
-	udig.domainQueue <- domain
-	return udig.resolveDomains()
+func (u *udigImpl) Resolve(domain string) []Resolution {
+	u.domainQueue <- domain
+	return u.resolveDomains()
 }
 
-func (udig *udigImpl) AddDomainResolver(resolver DomainResolver) {
-	udig.domainResolvers = append(udig.domainResolvers, resolver)
+func (u *udigImpl) AddDomainResolver(resolver DomainResolver) {
+	u.domainResolvers = append(u.domainResolvers, resolver)
 }
 
-func (udig *udigImpl) AddIPResolver(resolver IPResolver) {
-	udig.ipResolvers = append(udig.ipResolvers, resolver)
+func (u *udigImpl) AddIPResolver(resolver IPResolver) {
+	u.ipResolvers = append(u.ipResolvers, resolver)
 }
 
-func (udig *udigImpl) resolveDomains() (resolutions []Resolution) {
-	for len(udig.domainQueue) > 0 {
+func (u *udigImpl) resolveDomains() (resolutions []Resolution) {
+	for len(u.domainQueue) > 0 {
 		// Poll a domain.
-		domain := <-udig.domainQueue
+		domain := <-u.domainQueue
 
 		// Resolve it.
-		newResolutions := udig.resolveOneDomain(domain)
+		newResolutions := u.resolveOneDomain(domain)
 
 		// Store the results.
 		resolutions = append(resolutions, newResolutions...)
 
 		// Enqueue all related domains from the result.
-		udig.enqueueDomains(udig.getRelatedDomains(newResolutions)...)
+		u.enqueueDomains(u.getRelatedDomains(newResolutions)...)
 
 		// Resolve all the discovered IPs.
-		resolutions = append(resolutions, udig.resolveIPs()...)
+		resolutions = append(resolutions, u.resolveIPs()...)
 	}
 
 	return resolutions
 }
 
-func (udig *udigImpl) resolveIPs() (resolutions []Resolution) {
-	for len(udig.ipQueue) > 0 {
+func (u *udigImpl) resolveIPs() (resolutions []Resolution) {
+	for len(u.ipQueue) > 0 {
 		// Poll an IP.
-		ip := <-udig.ipQueue
+		ip := <-u.ipQueue
 
 		// Resolve it.
-		newResolutions := udig.resolveOneIP(ip)
+		newResolutions := u.resolveOneIP(ip)
 
 		resolutions = append(resolutions, newResolutions...)
 	}
@@ -121,25 +124,25 @@ func (udig *udigImpl) resolveIPs() (resolutions []Resolution) {
 	return resolutions
 }
 
-func (udig *udigImpl) resolveOneDomain(domain string) (resolutions []Resolution) {
+func (u *udigImpl) resolveOneDomain(domain string) (resolutions []Resolution) {
 	// Make sure we don't repeat ourselves.
-	if udig.isProcessed(domain) {
+	if u.isProcessed(domain) {
 		return resolutions
 	}
-	defer udig.addProcessed(domain)
+	defer u.addProcessed(domain)
 
 	resolutionChannel := make(chan Resolution, 1024)
 
 	var wg sync.WaitGroup
-	wg.Add(len(udig.domainResolvers))
+	wg.Add(len(u.domainResolvers))
 
-	for _, resolver := range udig.domainResolvers {
+	for _, resolver := range u.domainResolvers {
 		go func(resolver DomainResolver) {
 			resolution := resolver.ResolveDomain(domain)
 			resolutionChannel <- resolution
 
 			// Enqueue all discovered IPs.
-			udig.enqueueIps(resolution.IPs()...)
+			u.enqueueIps(resolution.IPs()...)
 
 			wg.Done()
 		}(resolver)
@@ -154,19 +157,19 @@ func (udig *udigImpl) resolveOneDomain(domain string) (resolutions []Resolution)
 	return resolutions
 }
 
-func (udig *udigImpl) resolveOneIP(ip string) (resolutions []Resolution) {
+func (u *udigImpl) resolveOneIP(ip string) (resolutions []Resolution) {
 	// Make sure we don't repeat ourselves.
-	if udig.isProcessed(ip) {
+	if u.isProcessed(ip) {
 		return resolutions
 	}
-	defer udig.addProcessed(ip)
+	defer u.addProcessed(ip)
 
 	resolutionChannel := make(chan Resolution, 1024)
 
 	var wg sync.WaitGroup
-	wg.Add(len(udig.ipResolvers))
+	wg.Add(len(u.ipResolvers))
 
-	for _, resolver := range udig.ipResolvers {
+	for _, resolver := range u.ipResolvers {
 		go func(resolver IPResolver) {
 			resolutionChannel <- resolver.ResolveIP(ip)
 			wg.Done()
@@ -182,7 +185,7 @@ func (udig *udigImpl) resolveOneIP(ip string) (resolutions []Resolution) {
 	return resolutions
 }
 
-func (udig *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution) bool {
+func (u *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution) bool {
 	switch resolution.Type() {
 	case TypeDNS:
 		for _, rr := range resolution.(*DNSResolution).Records {
@@ -195,20 +198,20 @@ func (udig *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution)
 	}
 
 	// Otherwise try heuristics.
-	return udig.isDomainRelated(nextDomain, resolution.Query())
+	return u.isDomainRelated(nextDomain, resolution.Query())
 }
 
-func (udig *udigImpl) getRelatedDomains(resolutions []Resolution) (domains []string) {
+func (u *udigImpl) getRelatedDomains(resolutions []Resolution) (domains []string) {
 	for _, resolution := range resolutions {
 		for _, nextDomain := range resolution.Domains() {
 			// Crawl new and related domains only.
-			if udig.isProcessed(nextDomain) || udig.isSeen(nextDomain) {
+			if u.isProcessed(nextDomain) || u.isSeen(nextDomain) {
 				continue
 			}
 
-			udig.addSeen(nextDomain)
+			u.addSeen(nextDomain)
 
-			if !udig.isCnameOrRelated(nextDomain, resolution) {
+			if !u.isCnameOrRelated(nextDomain, resolution) {
 				LogDebug("%s: Domain %s is not related to %s -> skipping.", resolution.Type(), nextDomain, resolution.Query())
 				continue
 			}
@@ -221,30 +224,30 @@ func (udig *udigImpl) getRelatedDomains(resolutions []Resolution) (domains []str
 	return domains
 }
 
-func (udig *udigImpl) enqueueDomains(domains ...string) {
+func (u *udigImpl) enqueueDomains(domains ...string) {
 	for _, domain := range domains {
-		udig.domainQueue <- domain
+		u.domainQueue <- domain
 	}
 }
 
-func (udig *udigImpl) enqueueIps(ips ...string) {
+func (u *udigImpl) enqueueIps(ips ...string) {
 	for _, ip := range ips {
-		udig.ipQueue <- ip
+		u.ipQueue <- ip
 	}
 }
 
-func (udig *udigImpl) isProcessed(query string) bool {
-	return udig.processed[query]
+func (u *udigImpl) isProcessed(query string) bool {
+	return u.processed[query]
 }
 
-func (udig *udigImpl) addProcessed(query string) {
-	udig.processed[query] = true
+func (u *udigImpl) addProcessed(query string) {
+	u.processed[query] = true
 }
 
-func (udig *udigImpl) isSeen(query string) bool {
-	return udig.seen[query]
+func (u *udigImpl) isSeen(query string) bool {
+	return u.seen[query]
 }
 
-func (udig *udigImpl) addSeen(query string) {
-	udig.seen[query] = true
+func (u *udigImpl) addSeen(query string) {
+	u.seen[query] = true
 }
