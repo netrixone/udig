@@ -49,12 +49,18 @@ func init() {
 	localNameServer = findLocalNameServer()
 }
 
+// defaultLocalNameServer is used when /etc/resolv.conf is missing or has no servers.
+const defaultLocalNameServer = "127.0.0.1:53"
+
 func findLocalNameServer() string {
 	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil || config == nil {
-		LogPanic("Cannot initialize the local resolver: %s", err)
-	} else if len(config.Servers) == 0 {
-		LogPanic("No local name server found")
+		LogErr("Cannot read resolv.conf: %v -> using %s", err, defaultLocalNameServer)
+		return defaultLocalNameServer
+	}
+	if len(config.Servers) == 0 {
+		LogErr("No name server in resolv.conf -> using %s", defaultLocalNameServer)
+		return defaultLocalNameServer
 	}
 	return config.Servers[0] + ":53"
 }
