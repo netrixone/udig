@@ -193,7 +193,6 @@ func (u *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution) bo
 				return true
 			}
 		}
-		break
 	}
 
 	// Otherwise try heuristics.

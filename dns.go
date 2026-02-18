@@ -89,35 +89,27 @@ func dissectDomainsFromRecord(record dns.RR) (domains []string) {
 	switch record.Header().Rrtype {
 	case dns.TypeNS:
 		domains = append(domains, (record).(*dns.NS).Ns)
-		break
 
 	case dns.TypeCNAME:
 		domains = append(domains, (record).(*dns.CNAME).Target)
-		break
 
 	case dns.TypeSOA:
 		domains = append(domains, (record).(*dns.SOA).Mbox)
-		break
 
 	case dns.TypeMX:
 		domains = append(domains, (record).(*dns.MX).Mx)
-		break
 
 	case dns.TypeTXT:
 		domains = DissectDomainsFromStrings((record).(*dns.TXT).Txt)
-		break
 
 	case dns.TypeRRSIG:
 		domains = append(domains, (record).(*dns.RRSIG).SignerName)
-		break
 
 	case dns.TypeNSEC:
 		domains = append(domains, (record).(*dns.NSEC).NextDomain)
-		break
 
 	case dns.TypeKX:
 		domains = append(domains, (record).(*dns.KX).Exchanger)
-		break
 	}
 
 	for i := range domains {
@@ -131,16 +123,13 @@ func dissectIPsFromRecord(record dns.RR) (ips []string) {
 	switch record.Header().Rrtype {
 	case dns.TypeA:
 		ips = append(ips, (record).(*dns.A).A.String())
-		break
 
 	case dns.TypeAAAA:
 		ips = append(ips, (record).(*dns.AAAA).AAAA.String())
-		break
 
 	case dns.TypeTXT:
 		// For SPF typically.
 		ips = DissectIpsFromStrings((record).(*dns.TXT).Txt)
-		break
 	}
 
 	return ips

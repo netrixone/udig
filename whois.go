@@ -59,58 +59,58 @@ func parseWhoisResponse(reader io.Reader) (contacts []WhoisContact) {
 		switch key {
 		case "registry domain id":
 			setOrAppendString(&contact.RegistryDomainId, value)
-			break
+
 		case "registrant":
 			setOrAppendString(&(contact.Registrant), value)
-			break
+
 		case "registrant organization":
 			setOrAppendString(&contact.RegistrantOrganization, value)
-			break
+
 		case "registrant state/province":
 			setOrAppendString(&contact.RegistrantStateProvince, value)
-			break
+
 		case "registrant country":
 			setOrAppendString(&contact.RegistrantCountry, value)
-			break
+
 		case "registrar":
 			setOrAppendString(&contact.Registrar, value)
-			break
+
 		case "registrar iana id":
 			setOrAppendString(&contact.RegistrarIanaId, value)
-			break
+
 		case "registrar whois server":
 			setOrAppendString(&contact.RegistrarWhoisServer, value)
-			break
+
 		case "registrar url":
 			setOrAppendString(&contact.RegistrarUrl, value)
-			break
+
 		case "creation date":
 			setOrAppendString(&contact.CreationDate, value)
-			break
+
 		case "updated date":
 			setOrAppendString(&contact.UpdatedDate, value)
-			break
+
 		case "registered":
 			setOrAppendString(&contact.Registered, value)
-			break
+
 		case "changed":
 			setOrAppendString(&contact.Changed, value)
-			break
+
 		case "expire":
 			setOrAppendString(&contact.Expire, value)
-			break
+
 		case "nsset":
 			setOrAppendString(&contact.NSSet, value)
-			break
+
 		case "contact":
 			setOrAppendString(&contact.Contact, value)
-			break
+
 		case "name":
 			setOrAppendString(&contact.Name, value)
-			break
+
 		case "address":
 			setOrAppendString(&contact.Address, value)
-			break
+
 		}
 	}
 
