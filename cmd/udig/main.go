@@ -46,43 +46,36 @@ func resolve(domain string, options []udig.Option) {
 			for _, rr := range (res).(*udig.DNSResolution).Records {
 				udig.LogInfo("%s: %s %s -> %s", res.Type(), dns.TypeToString[rr.QueryType], res.Query(), formatPayload(rr.Record))
 			}
-			break
 
 		case udig.TypeTLS:
 			for _, cert := range (res).(*udig.TLSResolution).Certificates {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&cert))
 			}
-			break
 
 		case udig.TypeWHOIS:
 			for _, contact := range (res).(*udig.WhoisResolution).Contacts {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&contact))
 			}
-			break
 
 		case udig.TypeHTTP:
 			for _, header := range (res).(*udig.HTTPResolution).Headers {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&header))
 			}
-			break
 
 		case udig.TypeCT:
 			for _, ctLog := range (res).(*udig.CTResolution).Logs {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&ctLog))
 			}
-			break
 
 		case udig.TypeBGP:
 			for _, as := range (res).(*udig.BGPResolution).Records {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&as))
 			}
-			break
 
 		case udig.TypeGEO:
 			if (res).(*udig.GeoResolution).Record != nil {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.GeoResolution).Record))
 			}
-			break
 		}
 	}
 }
