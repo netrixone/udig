@@ -1,6 +1,7 @@
 package udig
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -159,4 +160,43 @@ func Test_isDomainRelated_By_invalid_domain(t *testing.T) {
 	// Assert.
 	assert.Equal(t, false, res1)
 	assert.Equal(t, false, res2)
+}
+
+func Test_DissectIpsFromString_IPv4(t *testing.T) {
+	ips := DissectIpsFromString("192.0.2.1 and 198.51.100.42")
+	assert.Len(t, ips, 2)
+	assert.Equal(t, "192.0.2.1", ips[0])
+	assert.Equal(t, "198.51.100.42", ips[1])
+}
+
+func Test_DissectIpsFromString_IPv6(t *testing.T) {
+	ips := DissectIpsFromString("host has 2001:db8::1")
+	assert.Len(t, ips, 1)
+	assert.Equal(t, "2001:db8::1", ips[0])
+}
+
+func Test_DissectIpsFromString_empty(t *testing.T) {
+	assert.Empty(t, DissectIpsFromString("no ips here"))
+}
+
+func Test_DissectIpsFromStrings_multiple(t *testing.T) {
+	ips := DissectIpsFromStrings([]string{"a 10.0.0.1 b", "c 10.0.0.2 d"})
+	assert.Len(t, ips, 2)
+	assert.Equal(t, "10.0.0.1", ips[0])
+	assert.Equal(t, "10.0.0.2", ips[1])
+}
+
+func Test_reverseIPv4(t *testing.T) {
+	// reverseIPv4 expects 16-byte form (indexes ip[12..15])
+	ip := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 2, 1}
+	rev := reverseIPv4(ip)
+	assert.Equal(t, "1.2.0.192", rev)
+}
+
+func Test_reverseIPv6(t *testing.T) {
+	ip := net.ParseIP("2001:db8::1")
+	assert.NotNil(t, ip)
+	rev := reverseIPv6(ip)
+	assert.NotEmpty(t, rev)
+	assert.Contains(t, rev, ".")
 }

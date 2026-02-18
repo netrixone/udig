@@ -2,6 +2,7 @@ package udig
 
 import (
 	"errors"
+	"net"
 	"sync"
 	"testing"
 
@@ -293,6 +294,51 @@ func Test_parentDomainOf_By_TLD(t *testing.T) {
 
 	// Assert.
 	assert.Empty(t, parent)
+}
+
+func Test_dissectIPsFromRecord_By_A_record(t *testing.T) {
+	record := &dns.A{
+		Hdr: dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeA},
+		A:   net.ParseIP("192.0.2.1"),
+	}
+	ips := dissectIPsFromRecord(record)
+	assert.Len(t, ips, 1)
+	assert.Equal(t, "192.0.2.1", ips[0])
+}
+
+func Test_dissectIPsFromRecord_By_AAAA_record(t *testing.T) {
+	record := &dns.AAAA{
+		Hdr:  dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeAAAA},
+		AAAA: net.ParseIP("2001:db8::1"),
+	}
+	ips := dissectIPsFromRecord(record)
+	assert.Len(t, ips, 1)
+	assert.Equal(t, "2001:db8::1", ips[0])
+}
+
+func Test_dissectIPsFromRecord_By_TXT_record_with_IPs(t *testing.T) {
+	record := &dns.TXT{
+		Hdr: dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeTXT},
+		Txt: []string{"v=spf1 ip4:192.0.2.0/24 ip4:198.51.100.1 -all"},
+	}
+	ips := dissectIPsFromRecord(record)
+	assert.GreaterOrEqual(t, len(ips), 1)
+	assert.Contains(t, ips, "198.51.100.1")
+}
+
+func Test_DNSResolution_IPs_aggregatesFromRecords(t *testing.T) {
+	res := &DNSResolution{
+		ResolutionBase: &ResolutionBase{query: "example.com"},
+		Records: []DNSRecordPair{
+			{QueryType: dns.TypeA, Record: &DNSRecord{RR: &dns.A{
+				Hdr: dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeA},
+				A:   net.ParseIP("192.0.2.1"),
+			}}},
+		},
+	}
+	ips := res.IPs()
+	assert.Len(t, ips, 1)
+	assert.Equal(t, "192.0.2.1", ips[0])
 }
 
 func mockDNSResponse(qType uint16, numRecords int) *dns.Msg {
