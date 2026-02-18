@@ -21,19 +21,14 @@ var ctExclude = "expired"
 
 // NewCTResolver creates a new CTResolver with sensible defaults.
 func NewCTResolver(timeout time.Duration) *CTResolver {
-	transport := http.DefaultTransport.(*http.Transport)
-
-	transport.DialContext = (&net.Dialer{
-		Timeout: timeout,
-	}).DialContext
-
-	transport.TLSHandshakeTimeout = timeout
-
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
+		TLSHandshakeTimeout: timeout,
+	}
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   timeout,
 	}
-
 	return &CTResolver{
 		Client:        client,
 		cachedResults: make(map[string]*CTResolution),
@@ -86,6 +81,7 @@ func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
 		return logs
 	}
+	defer res.Body.Close()
 
 	var rawBody []byte
 	if rawBody, err = io.ReadAll(res.Body); err != nil {

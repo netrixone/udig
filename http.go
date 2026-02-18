@@ -18,30 +18,15 @@ var (
 	}
 )
 
-// fetchHeaders connects to a given URL and on successful connection returns
-// a map of HTTP headers in the response.
-func fetchHeaders(url string) http.Header {
-	transport := http.DefaultTransport.(*http.Transport)
-
-	transport.DialContext = (&net.Dialer{
-		Timeout:   DefaultTimeout,
-		KeepAlive: DefaultTimeout,
-	}).DialContext
-
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = DefaultTimeout
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   DefaultTimeout,
-	}
-
+// fetchHeaders uses the given client to GET the URL and returns the response headers.
+func fetchHeaders(client *http.Client, url string) http.Header {
 	response, err := client.Get(url)
 	if err != nil {
 		// Don't bother trying to find CSP on non-TLS sites.
 		LogErr("HTTP: Could not GET %s - the cause was: %s.", url, err.Error())
 		return map[string][]string{}
 	}
+	defer response.Body.Close()
 
 	return response.Header
 }
@@ -52,20 +37,15 @@ func fetchHeaders(url string) http.Header {
 
 // NewHTTPResolver creates a new HTTPResolver with sensible defaults.
 func NewHTTPResolver(timeout time.Duration) *HTTPResolver {
-	transport := http.DefaultTransport.(*http.Transport)
-
-	transport.DialContext = (&net.Dialer{
-		Timeout: timeout,
-	}).DialContext
-
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = timeout
-
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSHandshakeTimeout: timeout,
+	}
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   timeout,
 	}
-
 	return &HTTPResolver{
 		Headers: DefaultHTTPHeaders[:],
 		Client:  client,
@@ -83,7 +63,7 @@ func (r *HTTPResolver) ResolveDomain(domain string) Resolution {
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
-	headers := fetchHeaders("https://" + domain)
+	headers := fetchHeaders(r.Client, "https://"+domain)
 	for _, name := range r.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
 		if len(DissectDomainsFromStrings(value)) > 0 {

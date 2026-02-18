@@ -15,20 +15,15 @@ import (
 
 // NewTLSResolver creates a new TLSResolver with sensible defaults.
 func NewTLSResolver(timeout time.Duration) *TLSResolver {
-	transport := http.DefaultTransport.(*http.Transport)
-
-	transport.DialContext = (&net.Dialer{
-		Timeout: timeout,
-	}).DialContext
-
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	transport.TLSHandshakeTimeout = timeout
-
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSHandshakeTimeout: timeout,
+	}
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   timeout,
 	}
-
 	return &TLSResolver{
 		Client: client,
 	}
@@ -59,9 +54,9 @@ func (r *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Certificat
 		LogErr("%s: %s -> %s", TypeTLS, domain, err.Error())
 		return chain
 	}
+	defer res.Body.Close()
 
 	if res.TLS == nil {
-		// No cert available.
 		return chain
 	}
 

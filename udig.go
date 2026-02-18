@@ -49,9 +49,8 @@ func NewUdig(opts ...Option) Udig {
 	return udig
 }
 
-// NewUdig creates a new Udig instance without any resolvers.
-// You can also supply your own resolvers to the returned
-// instance.
+// NewEmptyUdig creates a new Udig instance without any resolvers.
+// You can also supply your own resolvers to the returned instance.
 func NewEmptyUdig(opts ...Option) Udig {
 	return newUdigIml(opts...)
 }
