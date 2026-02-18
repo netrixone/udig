@@ -12,16 +12,6 @@ var (
 	GeoDBPath = findGeoipDatabase("IP2LOCATION-LITE-DB1.IPV6.BIN")
 )
 
-// CheckGeoipDatabase returns true if a given path points to a valid GeoIP DB file.
-func checkGeoipDatabase(geoipPath string) bool {
-	if info, err := os.Stat(geoipPath); err != nil || info.IsDir() {
-		LogErr("%s: Cannot use IP2Location DB at '%s' (file exists: %t).", TypeGEO, geoipPath, os.IsExist(err))
-		return false
-	}
-	_, err := ip2location.OpenDB(geoipPath)
-	return err == nil
-}
-
 // FindGeoipDatabase attempts to locate a GeoIP database file at a given path.
 //
 // If the given path is absolute, it is used as it is.
@@ -53,32 +43,24 @@ func findGeoipDatabase(geoipPath string) string {
 	return filepath.Join(filepath.Dir(executable), geoipPath)
 }
 
-func queryIP(ip string) *ip2location.IP2Locationrecord {
-	db, err := ip2location.OpenDB(GeoDBPath)
-	if err != nil {
-		LogErr("%s: Could not open DB. The cause was: %s", TypeGEO, err.Error())
-		return nil
-	}
-
-	record, err := db.Get_country_short(ip)
-	if err != nil {
-		LogErr("%s: Could not query DB for IP %s. The cause was: %s", TypeGEO, ip, err.Error())
-		return nil
-	}
-
-	db.Close()
-
-	return &record
-}
-
 /////////////////////////////////////////
 // GEO RESOLVER
 /////////////////////////////////////////
 
 // NewGeoResolver creates a new GeoResolver with sensible defaults.
+// The GeoIP database is opened once and reused for all lookups.
 func NewGeoResolver() *GeoResolver {
+	db, err := ip2location.OpenDB(GeoDBPath)
+	if err != nil {
+		LogErr("%s: Could not open DB at '%s'. The cause was: %s", TypeGEO, GeoDBPath, err.Error())
+		return &GeoResolver{
+			enabled:       false,
+			cachedResults: map[string]*GeoResolution{},
+		}
+	}
 	return &GeoResolver{
-		enabled:       checkGeoipDatabase(GeoDBPath),
+		enabled:       true,
+		db:            db,
 		cachedResults: map[string]*GeoResolution{},
 	}
 }
@@ -92,15 +74,16 @@ func (r *GeoResolver) ResolveIP(ip string) Resolution {
 	resolution = &GeoResolution{ResolutionBase: &ResolutionBase{query: ip}}
 	r.cachedResults[ip] = resolution
 
-	if !r.enabled {
+	if !r.enabled || r.db == nil {
 		return resolution
 	}
 
-	geoRecord := queryIP(ip)
-	if geoRecord == nil {
+	record, err := r.db.Get_country_short(ip)
+	if err != nil {
+		LogErr("%s: Could not query DB for IP %s. The cause was: %s", TypeGEO, ip, err.Error())
 		return resolution
 	}
-	resolution.Record = &GeoRecord{CountryCode: geoRecord.Country_short}
+	resolution.Record = &GeoRecord{CountryCode: record.Country_short}
 
 	return resolution
 }
@@ -114,7 +97,7 @@ func (r *GeoResolver) Type() ResolutionType {
 // GEO RESOLUTION
 /////////////////////////////////////////
 
-// Type returns "BGP".
+// Type returns "GEO".
 func (r *GeoResolution) Type() ResolutionType {
 	return TypeGEO
 }

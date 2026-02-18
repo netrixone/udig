@@ -2,6 +2,7 @@ package udig
 
 import (
 	"crypto/x509"
+	"github.com/ip2location/ip2location-go"
 	"net/http"
 	"time"
 
@@ -106,7 +107,7 @@ func WithDebugLogging() Option {
 	return WithLoggingLevel(LogLevelDebug)
 }
 
-// WithDebugLogging activates debug logging.
+// WithLoggingLevel sets the log level used for logging.
 func WithLoggingLevel(logLevel int) Option {
 	return newUdigOption(func(opt *udigImpl) {
 		LogLevel = logLevel
@@ -349,6 +350,7 @@ type ASRecord struct {
 type GeoResolver struct {
 	IPResolver
 	enabled       bool
+	db            *ip2location.DB
 	cachedResults map[string]*GeoResolution
 }
 
