@@ -153,6 +153,7 @@ func main() {
 	}
 
 	if *timeout != "" {
+		// Note: already validated value.
 		t, _ := time.ParseDuration(*timeout)
 		options = append(options, udig.WithTimeout(t))
 	}
@@ -162,6 +163,7 @@ func main() {
 	}
 
 	if *ctFrom != "" {
+		// Note: already validated value.
 		since, _ := time.Parse(*ctFrom, "2006-01-02")
 		options = append(options, udig.WithCTSince(since))
 	}
