@@ -16,11 +16,16 @@ import (
 const DefaultCTApiUrl = "https://crt.sh"
 
 var CTApiUrl = DefaultCTApiUrl
-var ctSince = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
-var ctExclude = "expired"
 
 // NewCTResolver creates a new CTResolver with sensible defaults.
-func NewCTResolver(timeout time.Duration) *CTResolver {
+// since is the minimum log date in YYYY-MM-DD format; exclude is the crt.sh exclude parameter (e.g. "expired").
+func NewCTResolver(timeout time.Duration, since, exclude string) *CTResolver {
+	if since == "" {
+		since = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+	}
+	if exclude == "" {
+		exclude = "expired" // default: exclude expired logs
+	}
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
 		TLSHandshakeTimeout: timeout,
@@ -32,6 +37,8 @@ func NewCTResolver(timeout time.Duration) *CTResolver {
 	return &CTResolver{
 		Client:        client,
 		cachedResults: make(map[string]*CTResolution),
+		ctSince:       since,
+		ctExclude:     exclude,
 	}
 }
 
@@ -75,7 +82,7 @@ func (r *CTResolver) cacheLookup(domain string) *CTResolution {
 }
 
 func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
-	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, ctExclude, domain)
+	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, r.ctExclude, domain)
 	res, err := r.Client.Get(url)
 	if err != nil {
 		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
@@ -101,7 +108,7 @@ func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 
 		// Skip logs outside of our time scope.
 		// @todo: maybe use a DB to query CRT.sh and filter the logs directly
-		if log.LoggedAt < ctSince {
+		if log.LoggedAt < r.ctSince {
 			continue
 		}
 

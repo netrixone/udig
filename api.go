@@ -50,6 +50,7 @@ const (
 //  2. deals with domain crawling
 //  3. caches intermediate results and summarizes the outputs
 type Udig interface {
+	// Resolve runs resolution and recursive discovery for the given domain; it returns a channel that is closed when done.
 	Resolve(domain string) <-chan Resolution
 	AddDomainResolver(resolver DomainResolver)
 	AddIPResolver(resolver IPResolver)
@@ -138,14 +139,14 @@ func WithTimeout(timeout time.Duration) Option {
 // WithCTExpired includes expired Certificate Transparency logs in the results (slower).
 func WithCTExpired() Option {
 	return newUdigOption(func(udig *udigImpl) {
-		ctExclude = ""
+		udig.ctExclude = ""
 	})
 }
 
-// WithCTSince ignored Certificate Transparency logs older than a given time.
+// WithCTSince ignores Certificate Transparency logs older than a given time.
 func WithCTSince(t time.Time) Option {
 	return newUdigOption(func(udig *udigImpl) {
-		ctSince = t.Format("2006-01-02")
+		udig.ctSince = t.Format("2006-01-02")
 	})
 }
 
@@ -285,6 +286,8 @@ type CTResolver struct {
 	DomainResolver
 	Client        *http.Client
 	cachedResults map[string]*CTResolution
+	ctSince       string // YYYY-MM-DD
+	ctExclude     string // e.g. "expired"
 }
 
 // CTResolution is a certificate transparency project resolution, which yields a CT log.

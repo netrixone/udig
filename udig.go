@@ -18,6 +18,8 @@ type udigImpl struct {
 	// Configurable:
 	isDomainRelated DomainRelationFn
 	timeout         time.Duration
+	ctSince         string
+	ctExclude       string
 }
 
 type udigOption struct {
@@ -41,7 +43,7 @@ func NewUdig(opts ...Option) Udig {
 	udig.AddDomainResolver(NewWhoisResolver(udig.timeout))
 	udig.AddDomainResolver(NewTLSResolver(udig.timeout))
 	udig.AddDomainResolver(NewHTTPResolver(udig.timeout))
-	udig.AddDomainResolver(NewCTResolver(udig.timeout))
+	udig.AddDomainResolver(NewCTResolver(udig.timeout, udig.ctSince, udig.ctExclude))
 
 	udig.AddIPResolver(NewBGPResolver(udig.timeout))
 	udig.AddIPResolver(NewGeoResolver())

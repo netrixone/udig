@@ -22,15 +22,10 @@ func Test_CTResolver_ResolveDomain_mockServer_returnsAggregatedLogs(t *testing.T
 	defer server.Close()
 
 	savedURL := CTApiUrl
-	savedSince := ctSince
 	CTApiUrl = server.URL
-	ctSince = "2000-01-01" // include all test logs
-	defer func() {
-		CTApiUrl = savedURL
-		ctSince = savedSince
-	}()
+	defer func() { CTApiUrl = savedURL }()
 
-	resolver := NewCTResolver(10 * time.Second)
+	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
 	resolution := resolver.ResolveDomain("example.com")
 	assert.Equal(t, TypeCT, resolution.Type())
 	assert.Equal(t, "example.com", resolution.Query())
@@ -51,15 +46,10 @@ func Test_CTResolver_ResolveDomain_cachesResult(t *testing.T) {
 	defer server.Close()
 
 	savedURL := CTApiUrl
-	savedSince := ctSince
 	CTApiUrl = server.URL
-	ctSince = "2000-01-01"
-	defer func() {
-		CTApiUrl = savedURL
-		ctSince = savedSince
-	}()
+	defer func() { CTApiUrl = savedURL }()
 
-	resolver := NewCTResolver(10 * time.Second)
+	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
 	resolver.ResolveDomain("cachetest.example.com")
 	resolver.ResolveDomain("cachetest.example.com")
 	assert.Equal(t, 1, callCount)
