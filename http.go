@@ -3,6 +3,7 @@ package udig
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -27,6 +28,7 @@ func fetchHeaders(client *http.Client, url string) http.Header {
 		return map[string][]string{}
 	}
 	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, response.Body)
 
 	return response.Header
 }
@@ -38,8 +40,8 @@ func fetchHeaders(client *http.Client, url string) http.Header {
 // NewHTTPResolver creates a new HTTPResolver with sensible defaults.
 func NewHTTPResolver(timeout time.Duration) *HTTPResolver {
 	transport := &http.Transport{
-		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext:         (&net.Dialer{Timeout: timeout}).DialContext,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		TLSHandshakeTimeout: timeout,
 	}
 	client := &http.Client{

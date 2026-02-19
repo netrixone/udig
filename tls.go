@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -55,6 +56,7 @@ func (r *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Certificat
 		return chain
 	}
 	defer res.Body.Close()
+	_, _ = io.Copy(io.Discard, res.Body)
 
 	if res.TLS == nil {
 		return chain
