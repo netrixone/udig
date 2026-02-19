@@ -39,8 +39,8 @@ Feature set:
 
 ```go
 dig := udig.NewUdig()
-resolutions := dig.Resolve("example.com")
-for _, res := range resolutions {
+for res := range dig.Resolve("example.com") {
+	// Results are streamed as they become available.
 	...
 }
 ```

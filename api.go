@@ -2,11 +2,11 @@ package udig
 
 import (
 	"crypto/x509"
-	"github.com/ip2location/ip2location-go"
 	"net/http"
 	"time"
 
 	"github.com/domainr/whois"
+	"github.com/ip2location/ip2location-go"
 	"github.com/miekg/dns"
 )
 
@@ -50,7 +50,7 @@ const (
 //  2. deals with domain crawling
 //  3. caches intermediate results and summarizes the outputs
 type Udig interface {
-	Resolve(domain string) []Resolution
+	Resolve(domain string) <-chan Resolution
 	AddDomainResolver(resolver DomainResolver)
 	AddIPResolver(resolver IPResolver)
 }

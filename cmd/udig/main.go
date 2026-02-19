@@ -38,9 +38,9 @@ func resolve(domain string, options []udig.Option) {
 	}
 
 	dig := udig.NewUdig(options...)
-	resolutions := dig.Resolve(domain)
+	resChan := dig.Resolve(domain)
 
-	for _, res := range resolutions {
+	for res := range resChan {
 		switch res.Type() {
 		case udig.TypeDNS:
 			for _, rr := range (res).(*udig.DNSResolution).Records {
@@ -105,7 +105,7 @@ func main() {
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
 	beStrict := parser.Flag("s", "strict", &argparse.Options{Required: false, Help: "Strict domain relation (TLD match)"})
-	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve"})
+	domain := parser.List("d", "domain", &argparse.Options{Required: false, Help: "Domain(s) to resolve"})
 	timeout := parser.String("t", "timeout", &argparse.Options{
 		Required: false,
 		Help:     "Connection timeout",
@@ -136,7 +136,9 @@ func main() {
 	if *printVersion {
 		fmt.Println(version)
 		os.Exit(0)
-	} else if *domain == "" {
+	}
+
+	if len(*domain) == 0 {
 		fmt.Fprint(os.Stderr, parser.Usage(err))
 		os.Exit(1)
 	}
@@ -167,5 +169,7 @@ func main() {
 	outputJson = *jsonOutput
 
 	fmt.Println(banner)
-	resolve(*domain, options)
+	for _, d := range *domain {
+		resolve(d, options)
+	}
 }

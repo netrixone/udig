@@ -48,7 +48,10 @@ func Test_NewEmptyUdig_ApplyOptions_ThenResolve_returnsResolverResults(t *testin
 	udig.(*udigImpl).AddDomainResolver(&stubDomainResolver{
 		res: &stubResolution{typ: TypeHTTP, domains: nil, ips: nil},
 	})
-	resolutions := udig.Resolve("example.com")
+	var resolutions []Resolution
+	for r := range udig.Resolve("example.com") {
+		resolutions = append(resolutions, r)
+	}
 	assert.Len(t, resolutions, 1)
 	assert.Equal(t, TypeHTTP, resolutions[0].Type())
 	assert.Equal(t, "example.com", resolutions[0].Query())
@@ -63,7 +66,10 @@ func Test_NewEmptyUdig_WithRelatedDomains_enqueuesAndResolvesRelated(t *testing.
 			ips:     nil,
 		},
 	})
-	resolutions := udig.Resolve("example.com")
+	var resolutions []Resolution
+	for r := range udig.Resolve("example.com") {
+		resolutions = append(resolutions, r)
+	}
 	// Initial domain + related sub.example.com
 	assert.GreaterOrEqual(t, len(resolutions), 1)
 	queries := make(map[string]bool)
@@ -84,7 +90,10 @@ func Test_NewEmptyUdig_WithIPsFromDomain_enqueuesAndResolvesIPs(t *testing.T) {
 		},
 	})
 	udig.(*udigImpl).AddIPResolver(&stubIPResolver{typ: TypeBGP})
-	resolutions := udig.Resolve("example.com")
+	var resolutions []Resolution
+	for r := range udig.Resolve("example.com") {
+		resolutions = append(resolutions, r)
+	}
 	// At least domain resolution + one IP resolution (BGP)
 	assert.GreaterOrEqual(t, len(resolutions), 2)
 	var foundIP bool
