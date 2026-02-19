@@ -48,9 +48,7 @@ func lookupASN(ip string, client *dns.Client) (asnRecords []string) {
 		}
 
 		txt := (record).(*dns.TXT).Txt
-		for _, val := range txt {
-			asnRecords = append(asnRecords, val)
-		}
+		asnRecords = append(asnRecords, txt...)
 	}
 
 	return asnRecords

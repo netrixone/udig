@@ -17,8 +17,8 @@ type stubResolution struct {
 
 func (s *stubResolution) Query() string        { return s.query }
 func (s *stubResolution) Type() ResolutionType { return s.typ }
-func (s *stubResolution) Domains() []string   { return s.domains }
-func (s *stubResolution) IPs() []string      { return s.ips }
+func (s *stubResolution) Domains() []string    { return s.domains }
+func (s *stubResolution) IPs() []string        { return s.ips }
 
 // stubDomainResolver returns a fixed resolution for any domain.
 type stubDomainResolver struct {

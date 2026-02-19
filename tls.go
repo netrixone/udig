@@ -17,8 +17,8 @@ import (
 // NewTLSResolver creates a new TLSResolver with sensible defaults.
 func NewTLSResolver(timeout time.Duration) *TLSResolver {
 	transport := &http.Transport{
-		DialContext: (&net.Dialer{Timeout: timeout}).DialContext,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext:         (&net.Dialer{Timeout: timeout}).DialContext,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		TLSHandshakeTimeout: timeout,
 	}
 	client := &http.Client{

@@ -162,9 +162,7 @@ func (r *WhoisResolver) ResolveDomain(domain string) Resolution {
 	}
 
 	contacts := parseWhoisResponse(bytes.NewReader(response.Body))
-	for _, contact := range contacts {
-		resolution.Contacts = append(resolution.Contacts, contact)
-	}
+	resolution.Contacts = append(resolution.Contacts, contacts...)
 
 	return resolution
 }

@@ -53,9 +53,9 @@ func Test_WhoisContact_IsEmpty(t *testing.T) {
 
 func Test_WhoisContact_String(t *testing.T) {
 	c := WhoisContact{
-		Registrar: "TestReg",
+		Registrar:  "TestReg",
 		Registrant: "Acme",
-		Expire: "2025-01-01",
+		Expire:     "2025-01-01",
 	}
 	s := c.String()
 	assert.Contains(t, s, "TestReg")
