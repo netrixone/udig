@@ -1,124 +1,104 @@
-[![Build Status](https://travis-ci.com/netrixone/udig.svg?branch=master)](https://travis-ci.com/netrixone/udig)
+[![CI](https://github.com/netrixone/udig/actions/workflows/ci.yml/badge.svg)](https://github.com/netrixone/udig/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/netrixone/udig)](https://goreportcard.com/report/github.com/netrixone/udig)
 [![Go Doc](https://godoc.org/github.com/netrixone/udig?status.svg)](https://godoc.org/github.com/netrixone/udig)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetrixone%2Fudig.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetrixone%2Fudig?ref=badge_shield)
 
-# ÜberDig - dig on steroids
+# udig (ÜberDig) — dig on steroids
 
-**Simple GoLang tool for domain recon.**
+**Fast, non-intrusive domain reconnaissance tool written in Go.**
 
-The purpose of this tool is to provide fast overview of a target domain setup. Several active scanning techniques
-are employed for this purpose like DNS ping-pong, TLS certificate scraping, WHOIS banner parsing and more. 
-Some tools on the other hand are not - intentionally (e.g. nmap, brute-force, search engines etc.). This is not 
-a full-blown DNS enumerator, but rather something more unobtrusive and fast which can be deployed in long-term 
-experiments with lots of targets.
+Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration, TLS certificate scraping, WHOIS lookups, HTTP header analysis, Certificate Transparency log search, BGP ASN mapping, and GeoIP resolution. Discovered domains are automatically followed and resolved recursively.
 
-Feature set:
+This is not a full-blown DNS enumerator. There is no brute-forcing, no port scanning, no search engine scraping. udig is designed to be unobtrusive and fast, suitable for long-term experiments with many targets.
 
-- [x] Resolves a given domain to all DNS records of interest
-- [x] Resolves a given domain to a set of WHOIS contacts (selected properties only)
-- [x] Resolves a given domain to a TLS certificate chain
-- [x] Supports automatic NS discovery with custom override
-- [x] Dissects domains from resolutions and resolves them recursively
-- [x] Unobtrusive human-readable CLI output as well as machine readable JSON
-- [x] Supports multiple domains on the input
-- [x] Colorized output
-- [x] Parses domains in HTTP headers
-- [x] Parses domains in Certificate Transparency logs
-- [x] Parses IPs found in SPF record
-- [x] Looks up BGP AS for each discovered IP
-- [x] Looks up GeoIP record for each discovered IP
-- [ ] Attempts to detect DNS wildcards
-- [ ] Supports graph output
+## Features
 
-## Download as dependency
+- **DNS** — resolves all record types of interest (A, AAAA, NS, MX, TXT, SOA, ...) with automatic nameserver discovery
+- **TLS** — extracts full certificate chains and discovers domains from SANs
+- **WHOIS** — parses contact information from WHOIS banners
+- **HTTP** — inspects security-related headers (CSP, CORS, Alt-Svc, ...)
+- **Certificate Transparency** — queries crt.sh for historical and current certificates
+- **BGP** — maps discovered IPs to autonomous systems via Team Cymru
+- **GeoIP** — resolves country codes for discovered IPs via IP2Location
+- **Recursive crawling** — domains found in any resolution are automatically followed
+- **SPF parsing** — extracts IPs embedded in SPF records
+- **Output** — colorized human-readable CLI output or JSON
 
-`go get github.com/netrixone/udig`
+## Installation
 
-## Basic usage
+### Pre-built binary
 
-```go
-dig := udig.NewUdig()
-for res := range dig.Resolve("example.com") {
-	// Results are streamed as they become available.
-	...
-}
-```
+Download the latest release from the [Releases](https://github.com/netrixone/udig/releases) page.
 
-## API
+### Build from source
 
-```
-                                                         +------------+
-                                                         |            |
-                                                  +------+    Udig    +-----------------------------------+
-Delegates:                                        |      |            |                                   |
-                                                  |      +------------+                                   |
-                                                  |*                                                      |*
-                                      +------------------+                                           +------------+
-                                      |  DomainResolver  |                                           | IPResolver |
-             +----------------------> +------------------+ <------------------+                      +------------+
-             |                        ^      ^           ^                    |                         ^    ^
-Implements:  |                  +-----+      |           |                    |                         |    +-------+
-             |                  |            |           |                    |                         |            |
-     +-------------+ +-------------+ +--------------+ +---------------+ +------------+        +-------------+ +---------------+
-     | DNSResolver | | TLSResolver | | HTTPResolver | | WhoisResolver | | CTResolver |        | BGPResolver | | GeoipResolver |
-     +-------------+ +-------------+ +--------------+ +---------------+ +------------+        +-------------+ +---------------+
-             |              |                |               |             |                            |                |
-             |              |                |               |             |                            |                |
-Produces:    |              |                |               |             |                            |                |
-             |              |                |               |             |                            |                |
-             |*             |*               |*              |*            |*                           |*               |*
-      +-----------+ +----------------+ +------------+ +--------------+ +-------+                  +----------+   +-------------+
-      | DNSRecord | | TLSCertificate | | HTTPHeader | | WhoisContact | | CTLog |                  | ASRecord |   | GeoipRecord |
-      +-----------+ +----------------+ +------------+ +--------------+ +-------+                  +----------+   +-------------+
-
-```
-
-## CLI app
-
-### Download app
-
-`go get github.com/netrixone/udig/cmd/udig`
-
-### Build from the sources
-
-`make` or `make install`
-
-This will also download the latest GeoIP database (IPLocation-lite).
-
-### Usage
+Requires Go 1.24+.
 
 ```bash
+make            # build + test
+make install    # install binary + GeoIP database
+```
+
+The build automatically downloads the IP2Location LITE database if not already present.
+
+### Go install
+
+```bash
+go install github.com/netrixone/udig/cmd/udig@latest
+```
+
+## Usage
+
+```
 udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
-            [-d|--domain "<value>"] [-t|--timeout "<value>"] 
-            [--ct:expired] [--ct:from "<value>"] [--json]
+     [-d|--domain "<value>"] [-t|--timeout "<value>"]
+     [--ct:expired] [--ct:from "<value>"] [--json]
+```
 
-            ÜberDig - dig on steroids v1.6 by stuchl4n3k
+| Flag | Description |
+|------|-------------|
+| `-d`, `--domain` | Domain(s) to resolve (repeatable) |
+| `-s`, `--strict` | Strict domain relation — require TLD match |
+| `-t`, `--timeout` | Connection timeout (default: `10s`) |
+| `-V`, `--verbose` | Enable debug logging |
+| `--ct:expired` | Include expired Certificate Transparency logs |
+| `--ct:from` | CT log start date in `YYYY-MM-DD` format (default: 1 year ago) |
+| `--json` | Output payloads as JSON objects |
 
-Arguments:
+### Example
 
-  -h  --help        Print help information
-  -v  --version     Print version and exit
-  -V  --verbose     Be more verbose
-  -s  --strict      Strict domain relation (TLD match)
-  -d  --domain      Domain to resolve
-  -t  --timeout     Connection timeout. Default: 10s
-      --ct:expired  Collect expired CT logs
-      --ct:from     Date to collect logs from in YYYY-MM-DD format. Default: 1 year ago (2025-01-22)
-      --json        Output payloads as JSON objects
+```bash
+udig -d example.com
+udig -d example.com -d example.org --json
+udig -d example.com --ct:from 2024-01-01 -V
 ```
 
 ### Demo
 
 ![udig demo](doc/res/udig_demo.gif)
 
-## Dependencies and attributions
+## Using udig as a Go library
 
-* https://github.com/akamensky/argparse - Argparse for golang
-* https://github.com/miekg/dns - DNS library in Go 
-* https://github.com/domainr/whois - Whois client for Go
-* https://github.com/ip2location/ip2location-go - GeoIP localization package. This product uses IP2Location LITE data available from [https://lite.ip2location.com](https://lite.ip2location.com).
-* https://www.team-cymru.com/IP-ASN-mapping.html - IP to ASN mapping service by Team Cymru
+udig can be imported as a package for programmatic use. See [DEVELOPMENT.md](DEVELOPMENT.md) for the API overview, architecture, and build details.
+
+```go
+dig := udig.NewUdig()
+for res := range dig.Resolve("example.com") {
+    // Results stream in as they become available.
+    fmt.Println(res.Type(), res.Query())
+}
+```
+
+## Attributions
+
+- [miekg/dns](https://github.com/miekg/dns) — DNS library for Go
+- [akamensky/argparse](https://github.com/akamensky/argparse) — CLI argument parsing
+- [domainr/whois](https://github.com/domainr/whois) — WHOIS client for Go
+- [ip2location/ip2location-go](https://github.com/ip2location/ip2location-go) — GeoIP using [IP2Location LITE](https://lite.ip2location.com)
+- [Team Cymru](https://www.team-cymru.com/IP-ASN-mapping.html) — IP-to-ASN mapping service
 
 ## License
+
+MIT — see [LICENSE.txt](LICENSE.txt).
+
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetrixone%2Fudig.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetrixone%2Fudig?ref=badge_large)
