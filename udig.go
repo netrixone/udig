@@ -1,6 +1,7 @@
 package udig
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -81,11 +82,11 @@ func newUdigIml(opts ...Option) *udigImpl {
 	return udig
 }
 
-func (u *udigImpl) Resolve(domain string) <-chan Resolution {
-	resCh := make(chan Resolution, 256)
-
+func (u *udigImpl) Resolve(ctx context.Context, domain string) <-chan Resolution {
 	u.enqueueDomains(0, domain)
-	go u.resolveInto(resCh)
+
+	resCh := make(chan Resolution, 256)
+	go u.resolveInto(ctx, resCh)
 	return resCh
 }
 
@@ -97,9 +98,15 @@ func (u *udigImpl) AddIPResolver(resolver IPResolver) {
 	u.ipResolvers = append(u.ipResolvers, resolver)
 }
 
-func (u *udigImpl) resolveInto(resChan chan<- Resolution) {
+func (u *udigImpl) resolveInto(ctx context.Context, resChan chan<- Resolution) {
 	defer close(resChan)
 	for len(u.domainQueue) > 0 {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		domain := <-u.domainQueue
 
 		if u.maxDepth >= 0 && u.depthOf[domain] > u.maxDepth {
@@ -107,16 +114,21 @@ func (u *udigImpl) resolveInto(resChan chan<- Resolution) {
 			continue
 		}
 
-		u.resolveDomainInto(domain, resChan)
+		u.resolveDomainInto(domain, ctx, resChan)
 
 		for len(u.ipQueue) > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			ip := <-u.ipQueue
 			u.resolveIPInto(ip, resChan)
 		}
 	}
 }
 
-func (u *udigImpl) resolveDomainInto(domain string, resChan chan<- Resolution) {
+func (u *udigImpl) resolveDomainInto(domain string, ctx context.Context, resChan chan<- Resolution) {
 	if u.isProcessed(domain) {
 		return
 	}
@@ -128,14 +140,17 @@ func (u *udigImpl) resolveDomainInto(domain string, resChan chan<- Resolution) {
 	for _, resolver := range u.domainResolvers {
 		go func(resolver DomainResolver) {
 			resolution := resolver.ResolveDomain(domain)
-			resChan <- resolution
+			select {
+			case resChan <- resolution:
+				related := u.getRelatedDomains(resolution)
 
-			related := u.getRelatedDomains(resolution)
-			u.enqueueDomains(u.depthOf[domain]+1, related...)
+				// Enqueue all related domains.
+				u.enqueueDomains(u.depthOf[domain]+1, related...)
 
-			// Enqueue all discovered IPs.
-			u.enqueueIps(resolution.IPs()...)
-
+				// Enqueue all discovered IPs.
+				u.enqueueIps(resolution.IPs()...)
+			case <-ctx.Done():
+			}
 			wg.Done()
 		}(resolver)
 	}
@@ -198,6 +213,7 @@ func (u *udigImpl) getRelatedDomains(resolution Resolution) (domains []string) {
 	return domains
 }
 
+// enqueueDomains sets depth for each domain and enqueues it for resolution.
 func (u *udigImpl) enqueueDomains(depth int, domains ...string) {
 	for _, domain := range domains {
 		u.depthOf[domain] = depth

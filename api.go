@@ -1,6 +1,7 @@
 package udig
 
 import (
+	"context"
 	"crypto/x509"
 	"net/http"
 	"time"
@@ -50,8 +51,10 @@ const (
 //  2. deals with domain crawling
 //  3. caches intermediate results and summarizes the outputs
 type Udig interface {
-	// Resolve runs resolution and recursive discovery for the given domain; it returns a channel that is closed when done.
-	Resolve(domain string) <-chan Resolution
+	// Resolve runs resolution and recursive discovery for the given domain;
+	// it returns a channel that is closed when done.
+	// Context cancellation stops the crawl and closes the channel.
+	Resolve(ctx context.Context, domain string) <-chan Resolution
 	AddDomainResolver(resolver DomainResolver)
 	AddIPResolver(resolver IPResolver)
 }
@@ -166,7 +169,7 @@ func WithMaxDepth(n int) Option {
 // DNSResolver is a Resolver which is able to resolve a domain
 // to a bunch of the most interesting DNS records.
 //
-// You can configure which query types are actually used
+// You can configure which query types are actually used,
 // and you can also supply a custom name server.
 // If you don't a name server for each domain is discovered
 // using NS record query, falling back to a local NS
