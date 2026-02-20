@@ -36,10 +36,9 @@ Requires Go 1.24+.
 
 ```bash
 make            # build + test
-make install    # install binary + GeoIP database
+make install    # install binary (and copy GeoIP DB if present)
+make geoip      # optional: download GeoIP database for country lookups
 ```
-
-The build automatically downloads the IP2Location LITE database if not already present.
 
 ### Go install
 

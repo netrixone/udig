@@ -145,22 +145,29 @@ flowchart TB
 
 ### Prerequisites
 
-- Go 1.24+i
+- Go 1.24+
 - `make`
-- `wget` and `unzip` (for GeoIP database download)
+- `wget` and `unzip` (for `make geoip` — optional GeoIP database)
 - `upx` (only for `make release`)
 
 ### Make targets
 
 
-| Target         | Description                                    |
-| -------------- | ---------------------------------------------- |
-| `make`         | Build and run tests                            |
-| `make build`   | Compile binary (downloads GeoIP DB if missing) |
-| `make test`    | Run tests (requires prior build)               |
-| `make install` | Install binary and copy GeoIP DB               |
-| `make release` | Optimized build with UPX compression           |
-| `make clean`   | Remove binaries and GeoIP database             |
+| Target          | Description                                           |
+| --------------- | ----------------------------------------------------- |
+| `make`          | Build and run tests (default)                         |
+| `make build`    | Compile binary                                        |
+| `make test`     | Run tests                                             |
+| `make test-race`| Run tests with race detector                          |
+| `make install`  | Run tests, install binary, copy GeoIP DB if present   |
+| `make release`  | Stripped + UPX release binary                         |
+| `make clean`    | Remove binaries, GeoIP DB, test cache                  |
+| `make fmt`      | Format code                                           |
+| `make vet`      | Run `go vet`                                          |
+| `make lint`     | Run golangci-lint                                     |
+| `make mod-tidy` | Tidy go.mod / go.sum                                  |
+| `make geoip`    | Download GeoIP database if missing                    |
+| `make help`     | List targets                                          |
 
 
 ### Running tests
