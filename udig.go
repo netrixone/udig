@@ -14,12 +14,14 @@ type udigImpl struct {
 	ipQueue         chan string
 	processed       map[string]bool
 	seen            map[string]bool
+	depthOf         map[string]int // crawl depth of each discovered domain
 
 	// Configurable:
 	isDomainRelated DomainRelationFn
 	timeout         time.Duration
 	ctSince         string
 	ctExclude       string
+	maxDepth        int // -1 = unlimited (default)
 }
 
 type udigOption struct {
@@ -65,9 +67,11 @@ func newUdigIml(opts ...Option) *udigImpl {
 		ipQueue:         make(chan string, 1024),
 		processed:       map[string]bool{},
 		seen:            map[string]bool{},
+		depthOf:         map[string]int{},
 
 		isDomainRelated: DefaultDomainRelation,
 		timeout:         DefaultTimeout,
+		maxDepth:        -1,
 	}
 
 	for _, opt := range opts {
@@ -80,9 +84,8 @@ func newUdigIml(opts ...Option) *udigImpl {
 func (u *udigImpl) Resolve(domain string) <-chan Resolution {
 	resCh := make(chan Resolution, 256)
 
-	u.domainQueue <- domain
+	u.enqueueDomains(0, domain)
 	go u.resolveInto(resCh)
-
 	return resCh
 }
 
@@ -97,13 +100,15 @@ func (u *udigImpl) AddIPResolver(resolver IPResolver) {
 func (u *udigImpl) resolveInto(resChan chan<- Resolution) {
 	defer close(resChan)
 	for len(u.domainQueue) > 0 {
-		// Poll a domain.
 		domain := <-u.domainQueue
 
-		// Resolve it.
+		if u.maxDepth >= 0 && u.depthOf[domain] > u.maxDepth {
+			// Max depth reached -> skip.
+			continue
+		}
+
 		u.resolveDomainInto(domain, resChan)
 
-		// Resolve all the discovered IPs.
 		for len(u.ipQueue) > 0 {
 			ip := <-u.ipQueue
 			u.resolveIPInto(ip, resChan)
@@ -125,8 +130,8 @@ func (u *udigImpl) resolveDomainInto(domain string, resChan chan<- Resolution) {
 			resolution := resolver.ResolveDomain(domain)
 			resChan <- resolution
 
-			// Enqueue all related domains from the result.
-			u.enqueueDomains(u.getRelatedDomains(resolution)...)
+			related := u.getRelatedDomains(resolution)
+			u.enqueueDomains(u.depthOf[domain]+1, related...)
 
 			// Enqueue all discovered IPs.
 			u.enqueueIps(resolution.IPs()...)
@@ -193,8 +198,9 @@ func (u *udigImpl) getRelatedDomains(resolution Resolution) (domains []string) {
 	return domains
 }
 
-func (u *udigImpl) enqueueDomains(domains ...string) {
+func (u *udigImpl) enqueueDomains(depth int, domains ...string) {
 	for _, domain := range domains {
+		u.depthOf[domain] = depth
 		u.domainQueue <- domain
 	}
 }

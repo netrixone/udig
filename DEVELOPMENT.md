@@ -27,17 +27,19 @@ dig := udig.NewUdig(
     udig.WithStrictMode(),
     udig.WithTimeout(30 * time.Second),
     udig.WithCTSince(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+    udig.WithMaxDepth(3),
 )
 ```
 
 
-| Option               | Effect                                      |
-| -------------------- | ------------------------------------------- |
-| `WithDebugLogging()` | Enable verbose debug output                 |
-| `WithStrictMode()`   | Only follow domains that share the same TLD |
-| `WithTimeout(d)`     | Set connection timeout for all resolvers    |
-| `WithCTSince(t)`     | Only collect CT logs issued after this date |
-| `WithCTExpired()`    | Include expired CT log entries              |
+| Option               | Effect                                                    |
+| -------------------- | --------------------------------------------------------- |
+| `WithDebugLogging()` | Enable verbose debug output                               |
+| `WithStrictMode()`   | Only follow domains that share the same TLD               |
+| `WithTimeout(d)`     | Set connection timeout for all resolvers                  |
+| `WithCTSince(t)`     | Only collect CT logs issued after this date               |
+| `WithCTExpired()`    | Include expired CT log entries                             |
+| `WithMaxDepth(n)`    | Limit recursive discovery to n hops from seed (-1 = unlimited) |
 
 
 ### Working with resolutions

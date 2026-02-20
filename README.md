@@ -52,7 +52,7 @@ go install github.com/netrixone/udig/cmd/udig@latest
 ```
 udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
      [-d|--domain "<value>"] [-t|--timeout "<value>"]
-     [--ct:expired] [--ct:from "<value>"] [--json]
+     [--ct:expired] [--ct:from "<value>"] [--json] [--max-depth <value>]
 ```
 
 | Flag | Description |
@@ -64,6 +64,7 @@ udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
 | `--ct:expired` | Include expired Certificate Transparency logs |
 | `--ct:from` | CT log start date in `YYYY-MM-DD` format (default: 1 year ago) |
 | `--json` | Output payloads as JSON objects |
+| `--max-depth` | Max recursion depth (-1 = unlimited, 0 = seed only, default: -1) |
 
 ### Example
 
@@ -71,6 +72,7 @@ udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
 udig -d example.com
 udig -d example.com -d example.org --json
 udig -d example.com --ct:from 2024-01-01 -V
+udig -d example.com --max-depth 2
 ```
 
 ### Demo

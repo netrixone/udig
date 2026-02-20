@@ -40,6 +40,62 @@ func (r *stubIPResolver) ResolveIP(ip string) Resolution {
 	return &stubResolution{query: ip, typ: r.typ, domains: nil, ips: nil}
 }
 
+// stubChainResolver returns related domains from a map (for depth tests). Uses TypeHTTP to avoid isCnameOrRelated DNS type assertion.
+type stubChainResolver struct {
+	links map[string][]string
+}
+
+func (r *stubChainResolver) ResolveDomain(domain string) Resolution {
+	return &stubResolution{query: domain, typ: TypeHTTP, domains: r.links[domain], ips: nil}
+}
+
+func Test_WithMaxDepth_seedOnly(t *testing.T) {
+	udig := NewEmptyUdig(WithTimeout(5*time.Second), WithMaxDepth(0))
+	udig.(*udigImpl).AddDomainResolver(&stubChainResolver{
+		links: map[string][]string{"example.com": {"sub.example.com"}},
+	})
+	var queries []string
+	for r := range udig.Resolve("example.com") {
+		queries = append(queries, r.Query())
+	}
+	assert.Contains(t, queries, "example.com")
+	assert.NotContains(t, queries, "sub.example.com")
+}
+
+func Test_WithMaxDepth_oneLevelDeep(t *testing.T) {
+	udig := NewEmptyUdig(WithTimeout(5*time.Second), WithMaxDepth(1))
+	udig.(*udigImpl).AddDomainResolver(&stubChainResolver{
+		links: map[string][]string{
+			"example.com":     {"sub.example.com"},
+			"sub.example.com": {"deep.example.com"},
+		},
+	})
+	var queries []string
+	for r := range udig.Resolve("example.com") {
+		queries = append(queries, r.Query())
+	}
+	assert.Contains(t, queries, "example.com")
+	assert.Contains(t, queries, "sub.example.com")
+	assert.NotContains(t, queries, "deep.example.com")
+}
+
+func Test_WithMaxDepth_unlimited(t *testing.T) {
+	udig := NewEmptyUdig(WithTimeout(5 * time.Second))
+	udig.(*udigImpl).AddDomainResolver(&stubChainResolver{
+		links: map[string][]string{
+			"example.com":     {"sub.example.com"},
+			"sub.example.com": {"deep.example.com"},
+		},
+	})
+	var queries []string
+	for r := range udig.Resolve("example.com") {
+		queries = append(queries, r.Query())
+	}
+	assert.Contains(t, queries, "example.com")
+	assert.Contains(t, queries, "sub.example.com")
+	assert.Contains(t, queries, "deep.example.com")
+}
+
 func Test_NewEmptyUdig_ApplyOptions_ThenResolve_returnsResolverResults(t *testing.T) {
 	udig := NewEmptyUdig(
 		WithTimeout(5*time.Second),

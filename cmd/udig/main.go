@@ -126,6 +126,11 @@ func main() {
 		},
 	})
 	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
+	maxDepth := parser.Int("", "max-depth", &argparse.Options{
+		Required: false,
+		Help:     "Max recursion depth (-1 = unlimited, 0 = seed only)",
+		Default:  -1,
+	})
 
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -164,8 +169,12 @@ func main() {
 
 	if *ctFrom != "" {
 		// Note: already validated value.
-		since, _ := time.Parse(*ctFrom, "2006-01-02")
+		since, _ := time.Parse("2006-01-02", *ctFrom)
 		options = append(options, udig.WithCTSince(since))
+	}
+
+	if *maxDepth >= 0 {
+		options = append(options, udig.WithMaxDepth(*maxDepth))
 	}
 
 	outputJson = *jsonOutput

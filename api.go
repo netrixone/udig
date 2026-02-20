@@ -150,6 +150,15 @@ func WithCTSince(t time.Time) Option {
 	})
 }
 
+// WithMaxDepth limits recursive domain discovery depth.
+// Depth 0 = seed only, 1 = seed + one hop, etc.
+// Default: unlimited (-1).
+func WithMaxDepth(n int) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.maxDepth = n
+	})
+}
+
 /////////////////////////////////////////
 // DNS
 /////////////////////////////////////////
