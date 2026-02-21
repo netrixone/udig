@@ -22,7 +22,7 @@ This is not a full-blown DNS enumerator. There is no brute-forcing, no port scan
 - **GeoIP** — resolves country codes for discovered IPs via IP2Location
 - **Recursive crawling** — domains found in any resolution are automatically followed
 - **SPF parsing** — extracts IPs embedded in SPF records
-- **Output** — colorized human-readable CLI output or JSON
+- **Output** — colorized human-readable CLI output, JSON or graph as DOT (Graphviz), JSON, or terminal tree (`--graph=dot|json|term`)
 
 ## Installation
 
@@ -51,25 +51,28 @@ go install github.com/netrixone/udig/cmd/udig@latest
 ```
 udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
      [-d|--domain "<value>"] [-t|--timeout "<value>"]
-     [--ct:expired] [--ct:from "<value>"] [--json] [--max-depth <value>]
+     [--ct:expired] [--ct:from "<value>"] [--json] [--graph "<value>"] [--max-depth <value>]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `-d`, `--domain` | Domain(s) to resolve (repeatable) |
+| `-d`, `--domain` | Domain to resolve |
 | `-s`, `--strict` | Strict domain relation — require TLD match |
 | `-t`, `--timeout` | Connection timeout (default: `10s`) |
 | `-V`, `--verbose` | Enable debug logging |
 | `--ct:expired` | Include expired Certificate Transparency logs |
 | `--ct:from` | CT log start date in `YYYY-MM-DD` format (default: 1 year ago) |
 | `--json` | Output payloads as JSON objects |
+| `--graph` | Emit resolution graph: `dot`, `json`, or `term` (terminal tree) |
 | `--max-depth` | Max recursion depth (-1 = unlimited, 0 = seed only, default: -1) |
 
 ### Example
 
 ```bash
 udig -d example.com
-udig -d example.com -d example.org --json
+udig -d example.com --json
+udig -d example.com --graph=term    # tree in terminal
+udig -d example.com --graph=dot     # pipe to dot -Tpng for image
 udig -d example.com --ct:from 2024-01-01 -V
 udig -d example.com --max-depth 2
 ```

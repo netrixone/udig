@@ -72,6 +72,8 @@ func newUdigIml(opts ...Option) *udigImpl {
 
 		isDomainRelated: DefaultDomainRelation,
 		timeout:         DefaultTimeout,
+		ctSince:         "",
+		ctExclude:       "expired",
 		maxDepth:        -1,
 	}
 

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/netrixone/udig/cmd/udig/graph"
 	"net/url"
 	"os"
 	"time"
@@ -31,14 +33,8 @@ var (
 var outputJson = false
 
 func resolve(domain string, options []udig.Option) {
-	// Some input checks.
-	if !isValidDomain(domain) {
-		udig.LogErr("'%s' does not appear like a valid domain to me -> skipping.", domain)
-		return
-	}
-
 	dig := udig.NewUdig(options...)
-	resChan := dig.Resolve(domain)
+	resChan := dig.Resolve(context.Background(), domain)
 
 	for res := range resChan {
 		switch res.Type() {
@@ -105,7 +101,12 @@ func main() {
 	printVersion := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "Print version and exit"})
 	beVerbose := parser.Flag("V", "verbose", &argparse.Options{Required: false, Help: "Be more verbose"})
 	beStrict := parser.Flag("s", "strict", &argparse.Options{Required: false, Help: "Strict domain relation (TLD match)"})
-	domain := parser.List("d", "domain", &argparse.Options{Required: false, Help: "Domain(s) to resolve"})
+	domain := parser.String("d", "domain", &argparse.Options{Required: false, Help: "Domain to resolve", Validate: func(args []string) error {
+		if !isValidDomain(args[0]) {
+			return fmt.Errorf("'%s' is not a valid domain", args[0])
+		}
+		return nil
+	}})
 	timeout := parser.String("t", "timeout", &argparse.Options{
 		Required: false,
 		Help:     "Connection timeout",
@@ -126,6 +127,10 @@ func main() {
 		},
 	})
 	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
+	graphFormat := parser.Selector("g", "graph", []string{"term", "dot", "json"}, &argparse.Options{
+		Required: false,
+		Help:     "Emit resolution graph",
+	})
 	maxDepth := parser.Int("", "max-depth", &argparse.Options{
 		Required: false,
 		Help:     "Max recursion depth (-1 = unlimited, 0 = seed only)",
@@ -179,8 +184,19 @@ func main() {
 
 	outputJson = *jsonOutput
 
-	fmt.Println(banner)
-	for _, d := range *domain {
-		resolve(d, options)
+	if *graphFormat != "" {
+		g := graph.New()
+		g.Collect(*domain, options)
+		switch *graphFormat {
+		case "json":
+			g.EmitJSON()
+		case "term":
+			g.EmitTerminal()
+		default:
+			g.EmitDOT()
+		}
+	} else {
+		fmt.Println(banner)
+		resolve(*domain, options)
 	}
 }

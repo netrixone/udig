@@ -23,9 +23,7 @@ func NewCTResolver(timeout time.Duration, since, exclude string) *CTResolver {
 	if since == "" {
 		since = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
 	}
-	if exclude == "" {
-		exclude = "expired" // default: exclude expired logs
-	}
+
 	transport := &http.Transport{
 		DialContext:         (&net.Dialer{Timeout: timeout}).DialContext,
 		TLSHandshakeTimeout: timeout,
@@ -34,6 +32,7 @@ func NewCTResolver(timeout time.Duration, since, exclude string) *CTResolver {
 		Transport: transport,
 		Timeout:   timeout,
 	}
+
 	return &CTResolver{
 		Client:        client,
 		cachedResults: make(map[string]*CTResolution),
