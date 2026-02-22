@@ -299,7 +299,7 @@ func Test_DnssecSigned_true_when_DNSKEY_present(t *testing.T) {
 	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
 
 	// Assert.
-	assert.True(t, resolution.DnssecSigned)
+	assert.True(t, resolution.Signed)
 }
 
 func Test_DMARC_fields_parsed_from_dmarc_TXT(t *testing.T) {
@@ -347,7 +347,7 @@ func Test_DnssecSigned_false_when_no_DS_or_DNSKEY(t *testing.T) {
 	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
 
 	// Assert.
-	assert.False(t, resolution.DnssecSigned)
+	assert.False(t, resolution.Signed)
 }
 
 func Test_dissectDomain_By_unsupported_record(t *testing.T) {

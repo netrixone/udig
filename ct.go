@@ -9,6 +9,21 @@ import (
 	"time"
 )
 
+// crt.sh not_after formats seen in API responses
+var notAfterLayouts = []string{"2006-01-02", "2006-01-02 15:04:05", time.RFC3339}
+
+func parseNotAfter(s string) (t time.Time, active bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	for _, layout := range notAfterLayouts {
+		if parsed, err := time.Parse(layout, s); err == nil {
+			return parsed, !parsed.Before(time.Now())
+		}
+	}
+	return time.Time{}, false
+}
+
 /////////////////////////////////////////
 // CT RESOLVER
 /////////////////////////////////////////
@@ -131,6 +146,7 @@ func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
 	}
 
 	for _, log := range aggregatedLogs {
+		log.NotAfterTime, log.Active = parseNotAfter(log.NotAfter)
 		logs = append(logs, *log)
 	}
 

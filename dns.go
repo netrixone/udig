@@ -172,7 +172,7 @@ func (r *DNSResolver) ResolveDomain(domain string) Resolution {
 
 	resolution := &DNSResolution{
 		ResolutionBase: &ResolutionBase{query: domain},
-		nameServer:     nameServer,
+		NameServer:     nameServer,
 	}
 
 	// Now do a DNS query for each record type (in parallel),
@@ -202,7 +202,7 @@ func (r *DNSResolver) ResolveDomain(domain string) Resolution {
 	for _, rr := range resolution.Records {
 		rt := rr.Record.RR.Header().Rrtype
 		if rt == dns.TypeDS || rt == dns.TypeDNSKEY {
-			resolution.DnssecSigned = true
+			resolution.Signed = true
 			break
 		}
 	}

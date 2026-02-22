@@ -190,12 +190,12 @@ type DNSResolver struct {
 // in a form of query-answer pairs.
 type DNSResolution struct {
 	*ResolutionBase
-	Records      []DNSRecordPair
-	DnssecSigned bool     // true when DS or DNSKEY records are present
-	DMARCPolicy  string   // p= value from _dmarc TXT (none|quarantine|reject)
-	DMARCRua     []string // rua= reporting URIs
-	DMARCRuf     []string // ruf= reporting URIs
-	nameServer   string
+	Records     []DNSRecordPair
+	Signed      bool     // true when DS or DNSKEY records are present
+	DMARCPolicy string   // p= value from _dmarc TXT (none|quarantine|reject)
+	DMARCRua    []string // rua= reporting URIs
+	DMARCRuf    []string // ruf= reporting URIs
+	NameServer  string
 }
 
 // DNSRecordPair is a pair of DNS record type used in the query
@@ -318,11 +318,13 @@ type CTResolution struct {
 }
 
 // CTAggregatedLog is a wrapper of a CT log that is aggregated over all logs
-// with the same CN in time.
+// with the same CN in time. NotAfterTime and Active are set when logs are fetched.
 type CTAggregatedLog struct {
 	CTLog
-	FirstSeen string
-	LastSeen  string
+	FirstSeen    string
+	LastSeen     string
+	NotAfterTime time.Time // parsed from NotAfter
+	Active       bool      // true if certificate is still valid (NotAfterTime >= now)
 }
 
 // CTLog is a wrapper for attributes of interest that appear in the CT log.

@@ -83,7 +83,7 @@ func TestEmitTerminal(t *testing.T) {
 
 func TestEmitTerminal_emptySeed(t *testing.T) {
 	g := New()
-	g.Nodes["orphan.com"] = graphNodeDomain
+	g.Nodes["orphan.com"] = &Node{Label: "orphan.com", Type: nodeTypeDomain}
 	out, err := captureStdout(t, g.EmitTerminal)
 	require.NoError(t, err)
 
@@ -110,35 +110,35 @@ func TestEmitTerminal_sharedLeaf(t *testing.T) {
 	assert.GreaterOrEqual(t, usWithGeo, 2, "shared leaf US should appear under both IPs")
 }
 
-// makeTestGraph builds a small graph in memory (no resolution). Seed is "example.com"
+// makeTestGraph builds a small graph in memory (no resolution). Root is "example.com"
 // with one IP, one ASN, one country, and one child domain.
 func makeTestGraph() *Graph {
 	g := New()
-	g.Seed = "example.com"
-	g.Nodes["example.com"] = graphNodeDomain
-	g.Nodes["93.184.216.34"] = graphNodeIP
-	g.Nodes["AS15133 (MCI)"] = graphNodeASN
-	g.Nodes["US"] = graphNodeCountry
-	g.Nodes["ns.example.com"] = graphNodeDomain
-	g.Edges[Edge{From: "example.com", To: "93.184.216.34", Label: "DNS/A"}] = true
-	g.Edges[Edge{From: "example.com", To: "ns.example.com", Label: "DNS/NS"}] = true
-	g.Edges[Edge{From: "93.184.216.34", To: "AS15133 (MCI)", Label: "BGP/93.184.0.0/16"}] = true
-	g.Edges[Edge{From: "93.184.216.34", To: "US", Label: "GEO"}] = true
+	g.Root = "example.com"
+	g.Nodes["example.com"] = &Node{Label: "example.com", Type: nodeTypeDomain}
+	g.Nodes["93.184.216.34"] = &Node{Label: "93.184.216.34", Type: nodeTypeIP}
+	g.Nodes["AS15133 (MCI)"] = &Node{Label: "AS15133 (MCI)", Type: nodeTypeASN}
+	g.Nodes["US"] = &Node{Label: "US", Type: nodeTypeCountry}
+	g.Nodes["ns.example.com"] = &Node{Label: "ns.example.com", Type: nodeTypeDomain}
+	g.Edges = append(g.Edges, &Edge{From: "example.com", To: "93.184.216.34", Label: "DNS/A"})
+	g.Edges = append(g.Edges, &Edge{From: "example.com", To: "ns.example.com", Label: "DNS/NS"})
+	g.Edges = append(g.Edges, &Edge{From: "93.184.216.34", To: "AS15133 (MCI)", Label: "BGP/93.184.0.0/16"})
+	g.Edges = append(g.Edges, &Edge{From: "93.184.216.34", To: "US", Label: "GEO"})
 	return g
 }
 
 // makeTestGraphSharedLeaf builds a graph where two IPs point to the same country (shared leaf).
 func makeTestGraphSharedLeaf() *Graph {
 	g := New()
-	g.Seed = "example.com"
-	g.Nodes["example.com"] = graphNodeDomain
-	g.Nodes["1.2.3.4"] = graphNodeIP
-	g.Nodes["5.6.7.8"] = graphNodeIP
-	g.Nodes["US"] = graphNodeCountry
-	g.Edges[Edge{From: "example.com", To: "1.2.3.4", Label: "DNS/A"}] = true
-	g.Edges[Edge{From: "example.com", To: "5.6.7.8", Label: "DNS/A"}] = true
-	g.Edges[Edge{From: "1.2.3.4", To: "US", Label: "GEO"}] = true
-	g.Edges[Edge{From: "5.6.7.8", To: "US", Label: "GEO"}] = true
+	g.Root = "example.com"
+	g.Nodes["example.com"] = &Node{Label: "example.com", Type: nodeTypeDomain}
+	g.Nodes["1.2.3.4"] = &Node{Label: "1.2.3.4", Type: nodeTypeIP}
+	g.Nodes["5.6.7.8"] = &Node{Label: "5.6.7.8", Type: nodeTypeIP}
+	g.Nodes["US"] = &Node{Label: "US", Type: nodeTypeCountry}
+	g.Edges = append(g.Edges, &Edge{From: "example.com", To: "1.2.3.4", Label: "DNS/A"})
+	g.Edges = append(g.Edges, &Edge{From: "example.com", To: "5.6.7.8", Label: "DNS/A"})
+	g.Edges = append(g.Edges, &Edge{From: "1.2.3.4", To: "US", Label: "GEO"})
+	g.Edges = append(g.Edges, &Edge{From: "5.6.7.8", To: "US", Label: "GEO"})
 	return g
 }
 

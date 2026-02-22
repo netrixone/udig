@@ -8,50 +8,62 @@ import (
 	"strings"
 )
 
-type graphNodeType string
+type nodeType string
 
 const (
-	graphNodeDomain  graphNodeType = "domain"
-	graphNodeIP      graphNodeType = "ip"
-	graphNodeASN     graphNodeType = "asn"
-	graphNodeCountry graphNodeType = "country"
-	graphNodeWhois   graphNodeType = "whois"
+	nodeTypeDomain  nodeType = "domain"
+	nodeTypeIP      nodeType = "ip"
+	nodeTypeASN     nodeType = "asn"
+	nodeTypeCountry nodeType = "country"
+	nodeTypeWhois   nodeType = "whois"
 )
 
+func (t nodeType) String() string {
+	return string(t)
+}
+
 type Graph struct {
-	Nodes map[string]graphNodeType
-	Edges map[Edge]bool
-	Seed  string // domain passed to Collect; used as root for terminal output
+	Root  string
+	Nodes map[string]*Node
+	Edges []*Edge
 }
 
 func New() *Graph {
 	return &Graph{
-		Nodes: make(map[string]graphNodeType),
-		Edges: make(map[Edge]bool),
+		Nodes: make(map[string]*Node),
+		Edges: make([]*Edge, 0),
 	}
 }
 
-func (g *Graph) setNode(id string, nt graphNodeType) {
-	if _, exists := g.Nodes[id]; !exists {
-		g.Nodes[id] = nt
-	}
-}
-
-func (g *Graph) addEdges(from string, targets []string, nt graphNodeType, label string) {
-	for _, t := range targets {
-		if t != "" && t != from {
-			g.setNode(t, nt)
-			g.Edges[Edge{From: from, To: t, Label: label}] = true
+func (g *Graph) addNode(label string, nt nodeType) {
+	if _, exists := g.Nodes[label]; !exists {
+		g.Nodes[label] = &Node{
+			Label: label,
+			Type:  nt,
 		}
 	}
 }
 
-func (g *Graph) addEdge(from, to, label string, nt graphNodeType) {
+func (g *Graph) addEdges(from string, targets []string, label string, nt nodeType) {
+	for _, to := range targets {
+		g.addEdge(from, to, label, nt)
+	}
+}
+
+func (g *Graph) addEdge(from, to, label string, nt nodeType) {
 	if to == "" || to == from {
 		return
 	}
-	g.setNode(to, nt)
-	g.Edges[Edge{From: from, To: to, Label: label}] = true
+
+	// Make sure the target node exists.
+	g.addNode(to, nt)
+
+	g.Edges = append(g.Edges, &Edge{From: from, To: to, Label: label})
+}
+
+type Node struct {
+	Label string
+	Type  nodeType
 }
 
 type Edge struct {
@@ -61,81 +73,89 @@ type Edge struct {
 }
 
 func (g *Graph) Collect(domain string, options []udig.Option) {
-	g.Seed = domain
+	g.Root = domain
 	dig := udig.NewUdig(options...)
 	resChan := dig.Resolve(context.Background(), domain)
 
 	for res := range resChan {
-		q := res.Query()
+		query := res.Query()
 
 		switch res.Type() {
 		case udig.TypeDNS:
-			g.setNode(q, graphNodeDomain)
-			for _, rr := range res.(*udig.DNSResolution).Records {
+			dnsRes := res.(*udig.DNSResolution)
+			g.addNode(query, nodeTypeDomain)
+			if dnsRes.Signed {
+				g.Nodes[query].Label = query + " 🔒"
+			}
+
+			for _, rr := range dnsRes.Records {
 				rrType := dns.TypeToString[rr.Record.RR.Header().Rrtype]
 				label := "DNS/" + rrType
 				data := rr.Record.String()
-				g.addEdges(q, udig.DissectDomainsFromString(data), graphNodeDomain, label)
-				g.addEdges(q, udig.DissectIpsFromString(data), graphNodeIP, label)
+				g.addEdges(query, udig.DissectDomainsFromString(data), label, nodeTypeDomain)
+				g.addEdges(query, udig.DissectIpsFromString(data), label, nodeTypeIP)
 			}
 
-		case udig.TypePTR:
-			g.setNode(q, graphNodeIP)
-			g.addEdges(q, res.(*udig.PTRResolution).Hostnames, graphNodeDomain, "PTR")
-
 		case udig.TypeTLS:
-			g.setNode(q, graphNodeDomain)
+			g.addNode(query, nodeTypeDomain)
 			for _, cert := range res.(*udig.TLSResolution).Certificates {
-				g.addEdges(q, udig.DissectDomainsFromStrings(cert.DNSNames), graphNodeDomain, "TLS/SAN")
-				g.addEdges(q, udig.DissectDomainsFromStrings(cert.CRLDistributionPoints), graphNodeDomain, "TLS/CRL")
-				g.addEdges(q, udig.DissectDomainsFromString(cert.Issuer.String()), graphNodeDomain, "TLS/Issuer")
-				g.addEdges(q, udig.DissectDomainsFromString(cert.Subject.CommonName), graphNodeDomain, "TLS/CN")
+				g.addEdges(query, udig.DissectDomainsFromStrings(cert.DNSNames), "TLS/SAN", nodeTypeDomain)
+				g.addEdges(query, udig.DissectDomainsFromStrings(cert.CRLDistributionPoints), "TLS/CRL", nodeTypeDomain)
+				g.addEdges(query, udig.DissectDomainsFromString(cert.Issuer.String()), "TLS/Issuer", nodeTypeDomain)
+				g.addEdges(query, udig.DissectDomainsFromString(cert.Subject.CommonName), "TLS/CN", nodeTypeDomain)
 			}
 
 		case udig.TypeCT:
-			g.setNode(q, graphNodeDomain)
+			g.addNode(query, nodeTypeDomain)
 			for _, log := range res.(*udig.CTResolution).Logs {
-				g.addEdges(q, log.ExtractDomains(), graphNodeDomain, "CT")
+				label := "CT"
+				if !log.Active {
+					label = "CT/expired"
+				}
+				g.addEdges(query, log.ExtractDomains(), label, nodeTypeDomain)
 			}
 
 		case udig.TypeHTTP:
-			g.setNode(q, graphNodeDomain)
+			g.addNode(query, nodeTypeDomain)
 			for _, header := range res.(*udig.HTTPResolution).Headers {
-				g.addEdges(q, udig.DissectDomainsFromStrings(header.Value), graphNodeDomain, "HTTP/"+header.Name)
+				g.addEdges(query, udig.DissectDomainsFromStrings(header.Value), "HTTP/"+header.Name, nodeTypeDomain)
 			}
 
 		case udig.TypeWHOIS:
-			g.setNode(q, graphNodeDomain)
 			whoisRes := res.(*udig.WhoisResolution)
-			g.addEdges(q, res.Domains(), graphNodeDomain, "WHOIS")
+			g.addEdges(query, res.Domains(), "WHOIS", nodeTypeDomain)
+
 			for _, contact := range whoisRes.Contacts {
 				contactStr := contact.String()
-				g.addEdges(q, udig.DissectIpsFromString(contactStr), graphNodeIP, "WHOIS")
-				g.addEdge(q, formatWhoisContact(contact), "WHOIS/contact", graphNodeWhois)
+				g.addEdges(query, udig.DissectIpsFromString(contactStr), "WHOIS", nodeTypeIP)
+				g.addEdge(query, formatWhoisContact(contact), "WHOIS/contact", nodeTypeWhois)
 			}
 
 		case udig.TypeBGP:
-			g.setNode(q, graphNodeIP)
+			g.addNode(query, nodeTypeIP)
 			for _, as := range res.(*udig.BGPResolution).Records {
 				asNode := fmt.Sprintf("AS%d", as.ASN)
 				if as.Name != "" {
 					asNode = fmt.Sprintf("AS%d (%s)", as.ASN, as.Name)
 				}
-				g.setNode(asNode, graphNodeASN)
+
 				label := "BGP"
 				if as.BGPPrefix != "" {
 					label = "BGP/" + as.BGPPrefix
 				}
-				g.Edges[Edge{From: q, To: asNode, Label: label}] = true
+				g.addEdge(query, asNode, label, nodeTypeASN)
 			}
 
 		case udig.TypeGEO:
-			g.setNode(q, graphNodeIP)
+			g.addNode(query, nodeTypeIP)
 			geoRes := res.(*udig.GeoResolution)
 			if geoRes.Record != nil && geoRes.Record.CountryCode != "" {
-				g.setNode(geoRes.Record.CountryCode, graphNodeCountry)
-				g.Edges[Edge{From: q, To: geoRes.Record.CountryCode, Label: "GEO"}] = true
+				g.addEdge(query, geoRes.Record.CountryCode, "GEO", nodeTypeCountry)
 			}
+
+		case udig.TypePTR:
+			g.addNode(query, nodeTypeIP)
+			g.addEdges(query, res.(*udig.PTRResolution).Hostnames, "PTR", nodeTypeDomain)
 		}
 	}
 }

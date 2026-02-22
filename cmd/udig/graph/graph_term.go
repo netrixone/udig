@@ -15,17 +15,17 @@ const (
 
 // isSharedLeaf returns true for node types that are shared singletons (country codes,
 // ASN labels) which should appear under every parent that points to them.
-func (t graphNodeType) isSharedLeaf() bool {
-	return t == graphNodeCountry || t == graphNodeASN
+func (t nodeType) isSharedLeaf() bool {
+	return t == nodeTypeCountry || t == nodeTypeASN
 }
 
-func (t graphNodeType) termColor() string {
+func (t nodeType) termColor() string {
 	switch t {
-	case graphNodeIP:
+	case nodeTypeIP:
 		return termCyan
-	case graphNodeASN:
+	case nodeTypeASN:
 		return termGreen
-	case graphNodeCountry:
+	case nodeTypeCountry:
 		return termMagenta
 	default:
 		return termReset
@@ -35,14 +35,15 @@ func (t graphNodeType) termColor() string {
 // EmitTerminal renders the Graph as a tree in the terminal using Unicode box-drawing
 // and optional ANSI colors. The root is the seed domain from Collect. BFS avoids cycles.
 func (g *Graph) EmitTerminal() {
-	if g.Seed == "" {
+	if g.Root == "" {
 		return
 	}
+
 	adj := g.buildTermAdjacency()
 	treeEdges := g.bfsTree(adj)
 	treeMap := buildTreeMap(treeEdges)
-	printTermNode(g, g.Seed, "")
-	printTermSubtree(g, treeMap, g.Seed, "")
+	printTermNode(g, g.Root, "")
+	printTermSubtree(g, treeMap, g.Root, "")
 }
 
 type termEdge struct {
@@ -52,9 +53,10 @@ type termEdge struct {
 
 func (g *Graph) buildTermAdjacency() map[string][]termEdge {
 	adj := make(map[string][]termEdge)
-	for e := range g.Edges {
+	for _, e := range g.Edges {
 		adj[e.From] = append(adj[e.From], termEdge{To: e.To, Label: e.Label})
 	}
+
 	for from := range adj {
 		sort.Slice(adj[from], func(i, j int) bool {
 			a, b := adj[from][i], adj[from][j]
@@ -71,9 +73,9 @@ func (g *Graph) buildTermAdjacency() map[string][]termEdge {
 // Shared-leaf nodes (country, ASN) are duplicated under each parent so every
 // IP keeps its GEO/BGP children; all other nodes appear at most once.
 func (g *Graph) bfsTree(adj map[string][]termEdge) []struct{ From, To, Label string } {
-	visited := map[string]bool{g.Seed: true}
+	visited := map[string]bool{g.Root: true}
 	var queue []string
-	queue = append(queue, g.Seed)
+	queue = append(queue, g.Root)
 	var edges []struct{ From, To, Label string }
 
 	for len(queue) > 0 {
@@ -81,7 +83,7 @@ func (g *Graph) bfsTree(adj map[string][]termEdge) []struct{ From, To, Label str
 		queue = queue[1:]
 
 		for _, e := range adj[from] {
-			if visited[e.To] && !g.Nodes[e.To].isSharedLeaf() {
+			if visited[e.To] && !g.Nodes[e.To].Type.isSharedLeaf() {
 				continue
 			}
 			if !visited[e.To] {
@@ -113,20 +115,21 @@ func buildTreeMap(treeEdges []struct{ From, To, Label string }) map[string][]ter
 	return out
 }
 
-func printTermNode(g *Graph, id string, label string) {
-	color := g.Nodes[id].termColor()
+func printTermNode(g *Graph, id string, edgeLabel string) {
+	node := g.Nodes[id]
+	color := node.Type.termColor()
 	if color != termReset {
 		_, _ = fmt.Fprint(os.Stdout, color)
 	}
 
-	_, _ = fmt.Fprint(os.Stdout, id)
+	_, _ = fmt.Fprint(os.Stdout, node.Label)
 
 	if color != termReset {
 		_, _ = fmt.Fprint(os.Stdout, termReset)
 	}
 
-	if label != "" {
-		_, _ = fmt.Fprintf(os.Stdout, "  [%s]", label)
+	if edgeLabel != "" {
+		_, _ = fmt.Fprintf(os.Stdout, "  [%s]", edgeLabel)
 	}
 
 	_, _ = fmt.Fprintln(os.Stdout)

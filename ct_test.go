@@ -85,6 +85,27 @@ func Test_CTLog_String(t *testing.T) {
 	assert.Contains(t, s, "CA")
 }
 
+func Test_parseNotAfter_and_Active(t *testing.T) {
+	// Active: NotAfter in the future
+	t.Run("future", func(t *testing.T) {
+		parsed, active := parseNotAfter("2030-06-15")
+		assert.False(t, parsed.IsZero())
+		assert.True(t, active)
+	})
+	// Expired: NotAfter in the past
+	t.Run("past", func(t *testing.T) {
+		parsed, active := parseNotAfter("2020-01-01")
+		assert.False(t, parsed.IsZero())
+		assert.False(t, active)
+	})
+	// Empty NotAfter
+	t.Run("empty", func(t *testing.T) {
+		parsed, active := parseNotAfter("")
+		assert.True(t, parsed.IsZero())
+		assert.False(t, active)
+	})
+}
+
 func Test_CTAggregatedLog_String(t *testing.T) {
 	log := CTAggregatedLog{
 		CTLog:     CTLog{NameValue: "example.com", IssuerName: "CA"},
