@@ -23,7 +23,6 @@ var (
 func fetchHeaders(client *http.Client, url string) http.Header {
 	response, err := client.Get(url)
 	if err != nil {
-		// Don't bother trying to find CSP on non-TLS sites.
 		LogErr("HTTP: Could not GET %s - the cause was: %s.", url, err.Error())
 		return map[string][]string{}
 	}
@@ -31,6 +30,27 @@ func fetchHeaders(client *http.Client, url string) http.Header {
 	_, _ = io.Copy(io.Discard, response.Body)
 
 	return response.Header
+}
+
+// fetchBody fetches the given URL and returns the body as a string (up to 256 KB).
+func fetchBody(client *http.Client, url string) string {
+	response, err := client.Get(url)
+	if err != nil {
+		LogDebug("HTTP: Could not GET %s - %s.", url, err.Error())
+		return ""
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return ""
+	}
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, 256*1024))
+	if err != nil {
+		return ""
+	}
+	return string(body)
 }
 
 /////////////////////////////////////////
@@ -65,12 +85,22 @@ func (r *HTTPResolver) ResolveDomain(domain string) Resolution {
 		ResolutionBase: &ResolutionBase{query: domain},
 	}
 
-	headers := fetchHeaders(r.Client, "https://"+domain)
+	baseURL := "https://" + domain
+
+	headers := fetchHeaders(r.Client, baseURL)
 	for _, name := range r.Headers {
 		value := headers[http.CanonicalHeaderKey(name)]
 		if len(DissectDomainsFromStrings(value)) > 0 {
 			resolution.Headers = append(resolution.Headers, HTTPHeader{name, value})
 		}
+	}
+
+	if body := fetchBody(r.Client, baseURL+"/.well-known/security.txt"); body != "" {
+		resolution.SecurityTxtDomains = DissectDomainsFromString(body)
+	}
+
+	if body := fetchBody(r.Client, baseURL+"/robots.txt"); body != "" {
+		resolution.RobotsTxtDomains = DissectDomainsFromString(body)
 	}
 
 	return resolution
@@ -85,10 +115,26 @@ func (r *HTTPResolution) Type() ResolutionType {
 	return TypeHTTP
 }
 
-// Domains returns a list of domains discovered in records within this Resolution.
+// Domains returns a deduplicated list of domains from headers, security.txt, and robots.txt.
 func (r *HTTPResolution) Domains() (domains []string) {
+	seen := map[string]bool{}
 	for _, header := range r.Headers {
-		domains = append(domains, DissectDomainsFromStrings(header.Value)...)
+		for _, d := range DissectDomainsFromStrings(header.Value) {
+			seen[d] = true
+		}
+	}
+
+	for _, d := range r.SecurityTxtDomains {
+		seen[d] = true
+	}
+
+	for _, d := range r.RobotsTxtDomains {
+		seen[d] = true
+	}
+
+	domains = make([]string, 0, len(seen))
+	for d := range seen {
+		domains = append(domains, d)
 	}
 	return domains
 }

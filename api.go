@@ -282,7 +282,9 @@ type HTTPResolver struct {
 // HTTPResolution is a HTTP header resolution yielding many HTTP protocol headers.
 type HTTPResolution struct {
 	*ResolutionBase
-	Headers []HTTPHeader
+	Headers            []HTTPHeader
+	SecurityTxtDomains []string
+	RobotsTxtDomains   []string
 }
 
 // HTTPHeader is a pair of HTTP header name and corresponding value(s).

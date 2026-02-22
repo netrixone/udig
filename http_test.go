@@ -47,6 +47,71 @@ func Test_HTTPResolution_Domains_extractsDomainsFromHeaders(t *testing.T) {
 	assert.Contains(t, domains, "api.foo.com")
 }
 
+func Test_HTTPResolver_ResolveDomain_mockServer_securityTxtAndRobotsTxt(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/security.txt":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("Contact: https://vendor.com/security\nPolicy: https://vendor.com/policy\n"))
+		case "/robots.txt":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("Sitemap: https://cdn.example.com/sitemap.xml\nDisallow: /admin\n"))
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	resolver := NewHTTPResolver(10 * time.Second)
+	resolver.Client = server.Client()
+	domain := server.URL[8:]
+	resolution := resolver.ResolveDomain(domain).(*HTTPResolution)
+
+	assert.Contains(t, resolution.SecurityTxtDomains, "vendor.com")
+	assert.Contains(t, resolution.RobotsTxtDomains, "cdn.example.com")
+	allDomains := resolution.Domains()
+	assert.Contains(t, allDomains, "vendor.com")
+	assert.Contains(t, allDomains, "cdn.example.com")
+}
+
+func Test_HTTPResolver_ResolveDomain_mockServer_securityTxt404_ignored(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	resolver := NewHTTPResolver(10 * time.Second)
+	resolver.Client = server.Client()
+	domain := server.URL[8:]
+	resolution := resolver.ResolveDomain(domain).(*HTTPResolution)
+
+	assert.Empty(t, resolution.SecurityTxtDomains)
+	assert.Empty(t, resolution.RobotsTxtDomains)
+}
+
+func Test_HTTPResolution_Domains_deduplicatesAcrossSources(t *testing.T) {
+	res := &HTTPResolution{
+		ResolutionBase: &ResolutionBase{query: "example.com"},
+		Headers: []HTTPHeader{
+			{Name: "access-control-allow-origin", Value: []string{"https://shared.example.com"}},
+		},
+		SecurityTxtDomains: []string{"shared.example.com", "vendor.com"},
+		RobotsTxtDomains:   []string{"shared.example.com", "cdn.example.com"},
+	}
+	domains := res.Domains()
+	assert.Contains(t, domains, "shared.example.com")
+	assert.Contains(t, domains, "vendor.com")
+	assert.Contains(t, domains, "cdn.example.com")
+	// Count occurrences of shared.example.com — should be exactly 1.
+	count := 0
+	for _, d := range domains {
+		if d == "shared.example.com" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count)
+}
+
 func Test_HTTPHeader_String(t *testing.T) {
 	h := HTTPHeader{Name: "x-custom", Value: []string{"a", "b"}}
 	assert.Contains(t, h.String(), "x-custom")
