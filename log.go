@@ -9,12 +9,14 @@ import (
 const (
 	LogLevelDebug = 0
 	LogLevelInfo  = 10
-	LogLevelErr   = 100
-	LogLevelNone  = 1000
+	LogLevelWarn  = 100
+	LogLevelErr   = 1000
+	LogLevelNone  = 10000
 )
 
 const (
 	errColor   = "\033[1;91m"
+	warnColor  = "\033[93m"
 	infoColor  = "\033[1;92m"
 	debugColor = ""
 	noColor    = "\033[0m"
@@ -33,6 +35,13 @@ func LogPanic(format string, a ...interface{}) {
 func LogErr(format string, a ...interface{}) {
 	if LogLevel <= LogLevelErr {
 		fmt.Fprintf(os.Stderr, errColor+"[!] "+format+"\n"+noColor, a...)
+	}
+}
+
+// LogWarn formats and prints a given log on STDERR.
+func LogWarn(format string, a ...interface{}) {
+	if LogLevel <= LogLevelErr {
+		fmt.Fprintf(os.Stderr, warnColor+"[!] "+format+"\n"+noColor, a...)
 	}
 }
 

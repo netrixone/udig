@@ -2,7 +2,13 @@ package graph
 
 import (
 	"fmt"
+	"github.com/netrixone/udig"
 	"strings"
+)
+
+const (
+	DotWarnNodes = 50  // warn to stdout when graph has at least this many nodes
+	DotMaxNodes  = 200 // refuse to emit DOT when graph has this many nodes or more
 )
 
 func dotEdgeStyle(label string) (color, fontcolor string) {
@@ -33,7 +39,14 @@ func dotEdgeStyle(label string) (color, fontcolor string) {
 	}
 }
 
-func (g *Graph) EmitDOT() {
+func (g *Graph) EmitDOT() error {
+	n := len(g.Nodes)
+	if n >= DotMaxNodes {
+		return fmt.Errorf("graph has %d nodes; DOT output is limited to %d nodes", n, DotMaxNodes)
+	} else if n >= DotWarnNodes {
+		udig.LogWarn("Graph has %d nodes, DOT emission may take a while.", n)
+	}
+
 	fmt.Print(`digraph udig {
 	Graph [
 		rankdir=LR,
@@ -88,4 +101,5 @@ func (g *Graph) EmitDOT() {
 	}
 
 	fmt.Println("}")
+	return nil
 }

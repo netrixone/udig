@@ -3,6 +3,7 @@ package graph
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -14,7 +15,7 @@ import (
 
 func TestEmitDOT(t *testing.T) {
 	g := makeTestGraph()
-	out, err := captureStdout(t, g.EmitDOT)
+	out, err := captureStdout(t, func() { require.NoError(t, g.EmitDOT()) })
 	require.NoError(t, err)
 	assert.Contains(t, out, "digraph udig")
 	assert.Contains(t, out, `"example.com"`)
@@ -23,6 +24,20 @@ func TestEmitDOT(t *testing.T) {
 	assert.Contains(t, out, "DNS/A")
 	assert.Contains(t, out, "GEO")
 	assert.Contains(t, out, "->")
+}
+
+func TestEmitDOT_tooManyNodes(t *testing.T) {
+	g := New()
+	g.Root = "example.com"
+	for i := 0; i < DotMaxNodes; i++ {
+		id := fmt.Sprintf("node-%d.example.com", i)
+		g.Nodes[id] = &Node{Label: id, Type: nodeTypeDomain}
+	}
+	
+	err := g.EmitDOT()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "200")
+	assert.Contains(t, err.Error(), fmt.Sprintf("%d", DotMaxNodes))
 }
 
 func TestEmitJSON(t *testing.T) {

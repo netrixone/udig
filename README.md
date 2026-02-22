@@ -65,7 +65,7 @@ udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
 | `--ct:expired` | Include expired Certificate Transparency logs |
 | `--ct:from` | CT log start date in `YYYY-MM-DD` format (default: 1 year ago) |
 | `--json` | Output payloads as JSON objects |
-| `--graph` | Emit resolution graph: `dot`, `json`, or `term` (terminal tree) |
+| `--graph` | Emit resolution graph: `dot`, `json`, or `term` (terminal tree). DOT is limited to 200 nodes. |
 | `--max-depth` | Max recursion depth (-1 = unlimited, 0 = seed only, default: -1) |
 
 ### Example

@@ -134,7 +134,7 @@ func main() {
 	jsonOutput := parser.Flag("", "json", &argparse.Options{Required: false, Help: "Output payloads as JSON objects"})
 	graphFormat := parser.Selector("g", "graph", []string{"term", "dot", "json"}, &argparse.Options{
 		Required: false,
-		Help:     "Emit resolution graph",
+		Help:     "Emit resolution graph (dot, json, or term). DOT output is limited to 200 nodes.",
 	})
 	maxDepth := parser.Int("", "max-depth", &argparse.Options{
 		Required: false,
@@ -198,7 +198,9 @@ func main() {
 		case "term":
 			g.EmitTerminal()
 		default:
-			g.EmitDOT()
+			if err = g.EmitDOT(); err != nil {
+				udig.LogPanic("Error: %s", err)
+			}
 		}
 	} else {
 		fmt.Println(banner)
