@@ -18,18 +18,16 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	counterMux := sync.Mutex{}
 	invocationCount := 0
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-		count := recordsAvailable - invocationCount
-
-		// We need to count with a mutex, because DNS queries are run concurrently.
+		// All reads/writes of invocationCount under mutex (callbacks run concurrently).
 		counterMux.Lock()
 		invocationCount++
-		counterMux.Unlock()
-
-		if count > 0 {
+		// First 2 invocations are NS lookups (findNameServerFor); then len(QueryTypes)+1 add records.
+		// Return one record for invocations 3, 4, 5 so we get exactly 3 records.
+		count := 0
+		if invocationCount >= 3 && invocationCount <= 3+(recordsAvailable-2)-1 {
 			count = 1
-		} else {
-			count = 0
 		}
+		counterMux.Unlock()
 
 		msg := mockDNSResponse(dns.TypeA, count)
 		return msg, nil
@@ -44,7 +42,10 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	// Assert.
 
 	// 1 invocation per DNS query type + 1 DMARC query + 2 NS queries for all.tens.ten + tens.ten.
-	assert.Equal(t, len(DefaultDNSQueryTypes)+3, invocationCount)
+	counterMux.Lock()
+	totalInvocations := invocationCount
+	counterMux.Unlock()
+	assert.Equal(t, len(DefaultDNSQueryTypes)+3, totalInvocations)
 
 	// There should be a record for each mocked response.
 	assert.Len(t, resolution.Records, recordsAvailable-2)
@@ -52,9 +53,12 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 
 func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *testing.T) {
 	// Mock.
+	var usedNameServerMu sync.Mutex
 	var usedNameServer string
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		usedNameServerMu.Lock()
 		usedNameServer = nameServer
+		usedNameServerMu.Unlock()
 		return &dns.Msg{}, nil
 	}
 
@@ -66,7 +70,10 @@ func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *
 	resolver.ResolveDomain("example.com")
 
 	// Assert.
-	assert.Equal(t, resolver.NameServer, usedNameServer)
+	usedNameServerMu.Lock()
+	got := usedNameServer
+	usedNameServerMu.Unlock()
+	assert.Equal(t, resolver.NameServer, got)
 }
 
 func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
