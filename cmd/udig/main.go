@@ -43,6 +43,11 @@ func resolve(domain string, options []udig.Option) {
 				udig.LogInfo("%s: %s %s -> %s", res.Type(), dns.TypeToString[rr.QueryType], res.Query(), formatPayload(rr.Record))
 			}
 
+		case udig.TypePTR:
+			for _, hostname := range (res).(*udig.PTRResolution).Hostnames {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), hostname)
+			}
+
 		case udig.TypeTLS:
 			for _, cert := range (res).(*udig.TLSResolution).Certificates {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&cert))

@@ -27,6 +27,9 @@ const (
 	// TypeDNS is a type of all DNS resolutions.
 	TypeDNS ResolutionType = "DNS"
 
+	// TypePTR is a type of all PTR (reverse DNS) resolutions.
+	TypePTR ResolutionType = "PTR"
+
 	// TypeWHOIS is a type of all WHOIS resolutions.
 	TypeWHOIS ResolutionType = "WHOIS"
 
@@ -378,4 +381,20 @@ type GeoResolution struct {
 // GeoRecord contains information about a geographical location.
 type GeoRecord struct {
 	CountryCode string
+}
+
+/////////////////////////////////////////
+// PTR (reverse DNS)
+/////////////////////////////////////////
+
+// PTRResolver performs reverse DNS (PTR) lookups on discovered IPs.
+type PTRResolver struct {
+	IPResolver
+	Client *dns.Client
+}
+
+// PTRResolution is a PTR lookup result yielding hostnames.
+type PTRResolution struct {
+	*ResolutionBase
+	Hostnames []string
 }

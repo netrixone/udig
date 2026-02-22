@@ -79,6 +79,10 @@ func (g *Graph) Collect(domain string, options []udig.Option) {
 				g.addEdges(q, udig.DissectIpsFromString(data), graphNodeIP, label)
 			}
 
+		case udig.TypePTR:
+			g.setNode(q, graphNodeIP)
+			g.addEdges(q, res.(*udig.PTRResolution).Hostnames, graphNodeDomain, "PTR")
+
 		case udig.TypeTLS:
 			g.setNode(q, graphNodeDomain)
 			for _, cert := range res.(*udig.TLSResolution).Certificates {
