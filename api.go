@@ -190,8 +190,12 @@ type DNSResolver struct {
 // in a form of query-answer pairs.
 type DNSResolution struct {
 	*ResolutionBase
-	Records    []DNSRecordPair
-	nameServer string
+	Records      []DNSRecordPair
+	DnssecSigned bool     // true when DS or DNSKEY records are present
+	DMARCPolicy  string   // p= value from _dmarc TXT (none|quarantine|reject)
+	DMARCRua     []string // rua= reporting URIs
+	DMARCRuf     []string // ruf= reporting URIs
+	nameServer   string
 }
 
 // DNSRecordPair is a pair of DNS record type used in the query

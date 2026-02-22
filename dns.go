@@ -19,6 +19,7 @@ var (
 		dns.TypeSOA,
 		dns.TypeMX,
 		dns.TypeTXT,
+		dns.TypeCAA,
 		dns.TypeSIG,
 		dns.TypeKEY,
 		dns.TypeAAAA,
@@ -110,6 +111,12 @@ func dissectDomainsFromRecord(record dns.RR) (domains []string) {
 
 	case dns.TypeKX:
 		domains = append(domains, (record).(*dns.KX).Exchanger)
+
+	case dns.TypeCAA:
+		caa := (record).(*dns.CAA)
+		if strings.EqualFold(caa.Tag, "iodef") {
+			domains = append(domains, DissectDomainsFromString(caa.Value)...)
+		}
 	}
 
 	for i := range domains {
@@ -168,10 +175,11 @@ func (r *DNSResolver) ResolveDomain(domain string) Resolution {
 		nameServer:     nameServer,
 	}
 
-	// Now do a DNS query for each record type (in parallel).
+	// Now do a DNS query for each record type (in parallel),
+	// plus an additional _dmarc TXT query.
 	recordChannel := make(chan []DNSRecordPair, 128)
 	var wg sync.WaitGroup
-	wg.Add(len(r.QueryTypes))
+	wg.Add(len(r.QueryTypes) + 1)
 
 	for _, qType := range r.QueryTypes {
 		go func(qType uint16) {
@@ -179,12 +187,27 @@ func (r *DNSResolver) ResolveDomain(domain string) Resolution {
 			wg.Done()
 		}(qType)
 	}
+
+	go func() {
+		recordChannel <- r.resolveOne("_dmarc."+domain, dns.TypeTXT, nameServer)
+		wg.Done()
+	}()
 	wg.Wait()
 
 	// Collect the records.
 	for len(recordChannel) > 0 {
 		resolution.Records = append(resolution.Records, <-recordChannel...)
 	}
+
+	for _, rr := range resolution.Records {
+		rt := rr.Record.RR.Header().Rrtype
+		if rt == dns.TypeDS || rt == dns.TypeDNSKEY {
+			resolution.DnssecSigned = true
+			break
+		}
+	}
+
+	parseDMARCRecords(resolution)
 
 	return resolution
 }
@@ -263,6 +286,60 @@ func (r *DNSResolver) getNameServerFor(domain string) string {
 
 	// No record found.
 	return ""
+}
+
+// parseDMARCRecords scans for _dmarc TXT records and populates the DMARC fields.
+func parseDMARCRecords(resolution *DNSResolution) {
+	var raw string
+	for _, rr := range resolution.Records {
+		if rr.Record.RR.Header().Rrtype != dns.TypeTXT {
+			continue
+		}
+
+		name := strings.TrimSuffix(rr.Record.RR.Header().Name, ".")
+		if !strings.HasPrefix(strings.ToLower(name), "_dmarc.") {
+			continue
+		}
+
+		for _, s := range (rr.Record.RR).(*dns.TXT).Txt {
+			raw += s
+		}
+	}
+
+	if raw == "" {
+		return
+	}
+
+	for _, part := range strings.Split(raw, ";") {
+		part = strings.TrimSpace(part)
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(strings.ToLower(kv[0]))
+		val := strings.TrimSpace(kv[1])
+		switch key {
+		case "p":
+			resolution.DMARCPolicy = strings.ToLower(val)
+
+		case "rua":
+			for _, uri := range strings.Split(val, ",") {
+				uri = strings.TrimSpace(uri)
+				if uri != "" {
+					resolution.DMARCRua = append(resolution.DMARCRua, uri)
+				}
+			}
+
+		case "ruf":
+			for _, uri := range strings.Split(val, ",") {
+				uri = strings.TrimSpace(uri)
+				if uri != "" {
+					resolution.DMARCRuf = append(resolution.DMARCRuf, uri)
+				}
+			}
+		}
+	}
 }
 
 /////////////////////////////////////////

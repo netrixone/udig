@@ -7,21 +7,23 @@
 
 **Fast, non-intrusive domain reconnaissance tool written in Go.**
 
-Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration, TLS certificate scraping, WHOIS lookups, HTTP header analysis, Certificate Transparency log search, BGP ASN mapping, and GeoIP resolution. Discovered domains are automatically followed and resolved recursively.
+Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration (including CAA, DNSSEC, and DMARC), TLS certificate scraping, WHOIS lookups, HTTP analysis (headers, security.txt and robots.txt), Certificate Transparency log search, BGP ASN mapping, and GeoIP resolution. Discovered domains are automatically followed and resolved recursively.
 
 This is not a full-blown DNS enumerator. There is no brute-forcing, no port scanning, no search engine scraping. udig is designed to be unobtrusive and fast, suitable for long-term experiments with many targets.
 
 ## Features
 
-- **DNS** — resolves all record types of interest (A, AAAA, NS, MX, TXT, SOA, ...) with automatic nameserver discovery
+- **DNS** — resolves all record types of interest (A, AAAA, NS, MX, TXT, CAA, SOA, DS, DNSKEY, ...) with automatic nameserver discovery
+- **CAA & DNSSEC** — queries CAA records (extracts domains from `iodef` URLs), reports DNSSEC signing status
+- **SPF & DMARC parsing** — extracts IPs embedded in SPF records, queries `_dmarc.{domain}` TXT records, parses policy and `rua`/`ruf` reporting URIs
 - **TLS** — extracts full certificate chains and discovers domains from SANs
 - **WHOIS** — parses contact information from WHOIS banners
-- **HTTP** — inspects security-related headers (CSP, CORS, Alt-Svc, ...)
+- **HTTP** — inspects security-related headers (CSP, CORS, Alt-Svc, ...), fetches `security.txt` and `robots.txt` for domain discovery
 - **Certificate Transparency** — queries crt.sh for historical and current certificates
+- **PTR** — reverse DNS lookups on discovered IPs to reveal hostnames (mail servers, CDNs, cloud instances)
 - **BGP** — maps discovered IPs to autonomous systems via Team Cymru
 - **GeoIP** — resolves country codes for discovered IPs via IP2Location
 - **Recursive crawling** — domains found in any resolution are automatically followed
-- **SPF parsing** — extracts IPs embedded in SPF records
 - **Output** — colorized human-readable CLI output, JSON or graph as DOT (Graphviz), JSON, or terminal tree (`--graph=dot|json|term`)
 
 ## Installation

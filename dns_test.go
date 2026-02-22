@@ -3,6 +3,7 @@ package udig
 import (
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 
@@ -42,8 +43,8 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 
 	// Assert.
 
-	// There should have been 1 invocation per DNS query type and additional 2 spent on NS queries for all.tens.ten + tens.ten.
-	assert.Equal(t, len(DefaultDNSQueryTypes)+2, invocationCount)
+	// 1 invocation per DNS query type + 1 DMARC query + 2 NS queries for all.tens.ten + tens.ten.
+	assert.Equal(t, len(DefaultDNSQueryTypes)+3, invocationCount)
 
 	// There should be a record for each mocked response.
 	assert.Len(t, resolution.Records, recordsAvailable-2)
@@ -247,6 +248,106 @@ func Test_dissectDomain_By_KX_record(t *testing.T) {
 
 	// Assert.
 	assert.Equal(t, "related.example.com", domains[0])
+}
+
+func Test_dissectDomain_By_CAA_iodef_record(t *testing.T) {
+	// Setup.
+	record := &dns.CAA{
+		Hdr:   dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeCAA},
+		Flag:  0,
+		Tag:   "iodef",
+		Value: "mailto:security@reporting.example.com",
+	}
+
+	// Execute.
+	domains := dissectDomainsFromRecord(record)
+
+	// Assert.
+	assert.Contains(t, domains, "reporting.example.com")
+}
+
+func Test_dissectDomain_By_CAA_issue_record_yields_no_domains(t *testing.T) {
+	// Setup.
+	record := &dns.CAA{
+		Hdr:   dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeCAA},
+		Flag:  0,
+		Tag:   "issue",
+		Value: "letsencrypt.org",
+	}
+
+	// Execute.
+	domains := dissectDomainsFromRecord(record)
+
+	// Assert: issue tag values are CA names, not crawl targets.
+	assert.Empty(t, domains)
+}
+
+func Test_DnssecSigned_true_when_DNSKEY_present(t *testing.T) {
+	// Mock.
+	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		if qType == dns.TypeDNSKEY {
+			return mockDNSResponse(dns.TypeDNSKEY, 1), nil
+		}
+		return &dns.Msg{}, nil
+	}
+
+	// Setup.
+	resolver := NewDNSResolver(DefaultTimeout)
+	resolver.NameServer = "1.1.1.1"
+
+	// Execute.
+	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
+
+	// Assert.
+	assert.True(t, resolution.DnssecSigned)
+}
+
+func Test_DMARC_fields_parsed_from_dmarc_TXT(t *testing.T) {
+	// Mock.
+	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		if strings.HasPrefix(domain, "_dmarc.") && qType == dns.TypeTXT {
+			msg := &dns.Msg{}
+			msg.Answer = append(msg.Answer, &dns.TXT{
+				Hdr: dns.RR_Header{Name: "_dmarc.example.com.", Rrtype: dns.TypeTXT},
+				Txt: []string{"v=DMARC1; p=reject; rua=mailto:dmarc@vendor.com; ruf=mailto:forensic@vendor.com"},
+			})
+			return msg, nil
+		}
+		return &dns.Msg{}, nil
+	}
+
+	// Setup.
+	resolver := NewDNSResolver(DefaultTimeout)
+	resolver.NameServer = "1.1.1.1"
+
+	// Execute.
+	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
+
+	// Assert.
+	assert.Equal(t, "reject", resolution.DMARCPolicy)
+	assert.Contains(t, resolution.DMARCRua, "mailto:dmarc@vendor.com")
+	assert.Contains(t, resolution.DMARCRuf, "mailto:forensic@vendor.com")
+	assert.Contains(t, resolution.Domains(), "vendor.com")
+}
+
+func Test_DnssecSigned_false_when_no_DS_or_DNSKEY(t *testing.T) {
+	// Mock.
+	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
+		if qType == dns.TypeA {
+			return mockDNSResponse(dns.TypeA, 1), nil
+		}
+		return &dns.Msg{}, nil
+	}
+
+	// Setup.
+	resolver := NewDNSResolver(DefaultTimeout)
+	resolver.NameServer = "1.1.1.1"
+
+	// Execute.
+	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
+
+	// Assert.
+	assert.False(t, resolution.DnssecSigned)
 }
 
 func Test_dissectDomain_By_unsupported_record(t *testing.T) {
