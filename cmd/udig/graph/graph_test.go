@@ -33,7 +33,7 @@ func TestEmitDOT_tooManyNodes(t *testing.T) {
 		id := fmt.Sprintf("node-%d.example.com", i)
 		g.Nodes[id] = &Node{Label: id, Type: nodeTypeDomain}
 	}
-	
+
 	err := g.EmitDOT()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "200")

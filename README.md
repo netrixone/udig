@@ -7,7 +7,7 @@
 
 **Fast, non-intrusive domain reconnaissance tool written in Go.**
 
-Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration (including CAA, DNSSEC, and DMARC), TLS certificate scraping, WHOIS lookups, HTTP analysis (headers, security.txt and robots.txt), Certificate Transparency log search, BGP ASN mapping, and GeoIP resolution. Discovered domains are automatically followed and resolved recursively.
+Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration (including CAA, DNSSEC, and DMARC), TLS certificate scraping, WHOIS lookups, HTTP analysis (headers, security.txt and robots.txt), Certificate Transparency log search, BGP ASN mapping, GeoIP resolution, and RDAP (RIR registration data for discovered IPs). Discovered domains are automatically followed and resolved recursively.
 
 This is not a full-blown DNS enumerator. There is no brute-forcing, no port scanning, no search engine scraping. udig is designed to be unobtrusive and fast, suitable for long-term experiments with many targets.
 
@@ -23,6 +23,7 @@ This is not a full-blown DNS enumerator. There is no brute-forcing, no port scan
 - **PTR** — reverse DNS lookups on discovered IPs to reveal hostnames (mail servers, CDNs, cloud instances)
 - **BGP** — maps discovered IPs to autonomous systems via Team Cymru
 - **GeoIP** — resolves country codes for discovered IPs via IP2Location
+- **RDAP** — looks up IP registration metadata (network name, handle, range, abuse contact) via RIR RDAP servers using the IANA bootstrap (no API key)
 - **Recursive crawling** — domains found in any resolution are automatically followed
 - **Output** — colorized human-readable CLI output, JSON or graph as DOT (Graphviz), JSON, or terminal tree (`--graph=dot|json|term`)
 
@@ -65,7 +66,7 @@ udig [-h|--help] [-v|--version] [-V|--verbose] [-s|--strict]
 | `--ct:expired` | Include expired Certificate Transparency logs |
 | `--ct:from` | CT log start date in `YYYY-MM-DD` format (default: 1 year ago) |
 | `--json` | Output payloads as JSON objects |
-| `--graph` | Emit resolution graph: `dot`, `json`, or `term` (terminal tree). DOT is limited to 200 nodes. |
+| `--graph` | Emit resolution graph: `dot`, `json`, or `term` (terminal tree). DOT is limited to 200 nodes; a warning is shown at 50+ nodes. |
 | `--max-depth` | Max recursion depth (-1 = unlimited, 0 = seed only, default: -1) |
 
 ### Example
@@ -102,6 +103,7 @@ for res := range dig.Resolve("example.com") {
 - [domainr/whois](https://github.com/domainr/whois) — WHOIS client for Go
 - [ip2location/ip2location-go](https://github.com/ip2location/ip2location-go) — GeoIP using [IP2Location LITE](https://lite.ip2location.com)
 - [Team Cymru](https://www.team-cymru.com/IP-ASN-mapping.html) — IP-to-ASN mapping service
+- [IANA RDAP Bootstrap](https://data.iana.org/rdap/) — IP address space to RDAP server mapping (RFC 9224)
 
 ## License
 

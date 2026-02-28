@@ -16,6 +16,7 @@ const (
 	nodeTypeASN     nodeType = "asn"
 	nodeTypeCountry nodeType = "country"
 	nodeTypeWhois   nodeType = "whois"
+	nodeTypeRDAP    nodeType = "rdap"
 )
 
 func (t nodeType) String() string {
@@ -156,6 +157,20 @@ func (g *Graph) Collect(domain string, options []udig.Option) {
 		case udig.TypePTR:
 			g.addNode(query, nodeTypeIP)
 			g.addEdges(query, res.(*udig.PTRResolution).Hostnames, "PTR", nodeTypeDomain)
+
+		case udig.TypeRDAP:
+			g.addNode(query, nodeTypeIP)
+			rdapRes := res.(*udig.RDAPResolution)
+			if rdapRes.Record != nil {
+				nodeID := rdapRes.Record.Name
+				if nodeID == "" {
+					nodeID = "RDAP/" + rdapRes.Record.Handle
+				}
+
+				if nodeID != "" {
+					g.addEdge(query, nodeID, "RDAP", nodeTypeRDAP)
+				}
+			}
 		}
 	}
 }

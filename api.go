@@ -47,6 +47,9 @@ const (
 
 	// TypeGEO is a type of all GeoIP resolutions.
 	TypeGEO ResolutionType = "GEO"
+
+	// TypeRDAP is a type of all RDAP (Registration Data Access Protocol) resolutions.
+	TypeRDAP ResolutionType = "RDAP"
 )
 
 // Udig is a high-level facade for domain resolution which:
@@ -405,4 +408,34 @@ type PTRResolver struct {
 type PTRResolution struct {
 	*ResolutionBase
 	Hostnames []string
+}
+
+/////////////////////////////////////////
+// RDAP (Registration Data Access Protocol)
+/////////////////////////////////////////
+
+// RDAPResolver implements IPResolver by querying RIR RDAP servers for IP registration
+// data. It uses the IANA RDAP bootstrap to find the correct server per IP and caches
+// results. No API key is required.
+type RDAPResolver struct {
+	IPResolver
+	Client        *http.Client
+	cachedResults map[string]*RDAPResolution
+}
+
+// RDAPResolution is the result of an RDAP IP lookup; Record is nil on error or invalid IP.
+type RDAPResolution struct {
+	*ResolutionBase
+	Record *RDAPRecord
+}
+
+// RDAPRecord holds the main fields from an RDAP "ip network" response (RFC 9083).
+type RDAPRecord struct {
+	Handle       string // registry handle (e.g. NET-104-16-0-0-1)
+	Name         string // network name (e.g. CLOUDFLARENET)
+	StartAddress string
+	EndAddress   string
+	NetworkType  string // e.g. DIRECT ALLOCATION
+	OrgName      string // registrant org from entities
+	AbuseEmail   string // abuse contact email from entities
 }

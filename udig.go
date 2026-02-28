@@ -48,9 +48,10 @@ func NewUdig(opts ...Option) Udig {
 	udig.AddDomainResolver(NewHTTPResolver(udig.timeout))
 	udig.AddDomainResolver(NewCTResolver(udig.timeout, udig.ctSince, udig.ctExclude))
 
-	udig.AddIPResolver(NewPTRResolver(udig.timeout))
 	udig.AddIPResolver(NewBGPResolver(udig.timeout))
 	udig.AddIPResolver(NewGeoResolver())
+	udig.AddIPResolver(NewPTRResolver(udig.timeout))
+	udig.AddIPResolver(NewRDAPResolver(udig.timeout))
 
 	return udig
 }

@@ -34,6 +34,9 @@ func dotEdgeStyle(label string) (color, fontcolor string) {
 	case label == "GEO":
 		return "#CBA6F7", "#CBA6F7"
 
+	case label == "RDAP":
+		return "#89B4FA", "#89B4FA"
+
 	default:
 		return "#6C7086", "#9399B2"
 	}
@@ -87,6 +90,9 @@ func (g *Graph) EmitDOT() error {
 
 		case nodeTypeWhois:
 			attrs = `fillcolor="#6C7086", fontcolor="#CDD6F4"`
+
+		case nodeTypeRDAP:
+			attrs = `fillcolor="#89B4FA", fontcolor="#1B1B1C"`
 
 		default:
 			attrs = `fillcolor="#313244", fontcolor="#CDD6F4"`

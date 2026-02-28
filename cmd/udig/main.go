@@ -77,6 +77,11 @@ func resolve(domain string, options []udig.Option) {
 			if (res).(*udig.GeoResolution).Record != nil {
 				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.GeoResolution).Record))
 			}
+
+		case udig.TypeRDAP:
+			if (res).(*udig.RDAPResolution).Record != nil {
+				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.RDAPResolution).Record))
+			}
 		}
 	}
 }
