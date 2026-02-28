@@ -13,14 +13,14 @@ func Test_GeoResolver_Type_returnsTypeGEO(t *testing.T) {
 
 func Test_GeoResolver_ResolveIP_returnsResolutionWithQuery(t *testing.T) {
 	r := NewGeoResolver()
-	resolution := r.ResolveIP("192.0.2.1")
-	assert.Equal(t, TypeGEO, resolution.Type())
-	assert.Equal(t, "192.0.2.1", resolution.Query())
-	gr, ok := resolution.(*GeoResolution)
-	assert.True(t, ok)
-	assert.NotNil(t, gr)
-	// With or without DB, Record may be nil
-	assert.NotNil(t, gr.ResolutionBase)
+	resolutions := r.ResolveIP("192.0.2.1")
+	if r.enabled {
+		assert.Len(t, resolutions, 1)
+		assert.Equal(t, TypeGEO, resolutions[0].Type())
+		assert.Equal(t, "192.0.2.1", resolutions[0].Query())
+	} else {
+		assert.Empty(t, resolutions)
+	}
 }
 
 func Test_GeoResolution_Type_returnsTypeGEO(t *testing.T) {

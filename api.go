@@ -2,13 +2,7 @@ package udig
 
 import (
 	"context"
-	"crypto/x509"
-	"net/http"
 	"time"
-
-	"github.com/domainr/whois"
-	"github.com/ip2location/ip2location-go"
-	"github.com/miekg/dns"
 )
 
 /////////////////////////////////////////
@@ -26,6 +20,9 @@ type ResolutionType string
 const (
 	// TypeDNS is a type of all DNS resolutions.
 	TypeDNS ResolutionType = "DNS"
+
+	// TypeDMARC is a type of all DMARC resolutions.
+	TypeDMARC ResolutionType = "DMARC"
 
 	// TypePTR is a type of all PTR (reverse DNS) resolutions.
 	TypePTR ResolutionType = "PTR"
@@ -67,13 +64,15 @@ type Udig interface {
 
 // DomainResolver is an API contract for all Resolver modules that resolve domains.
 // Discovered domains that relate to the original query are recursively resolved.
+// Each returned Resolution carries exactly one result (1 type, 1 query, 1 value).
 type DomainResolver interface {
-	ResolveDomain(domain string) Resolution // Resolves a given domain.
+	ResolveDomain(domain string) []Resolution
 }
 
 // IPResolver is an API contract for all Resolver modules that resolve IPs.
+// Each returned Resolution carries exactly one result (1 type, 1 query, 1 value).
 type IPResolver interface {
-	ResolveIP(ip string) Resolution // Resolves a given IP.
+	ResolveIP(ip string) []Resolution
 }
 
 // Resolution is an API contract for all Resolutions (i.e. results).
@@ -84,358 +83,12 @@ type Resolution interface {
 	IPs() []string        // Returns a list of IP addresses discovered in this resolution.
 }
 
-// ResolutionBase is a shared implementation for all Resolutions (i.e. results).
+// ResolutionBase provides default implementations for the Resolution interface.
+// All resolution types embed this to inherit Query(), Domains(), and IPs().
 type ResolutionBase struct {
-	Resolution `json:"-"`
-	query      string
+	query string
 }
 
-// Query getter.
-func (res *ResolutionBase) Query() string {
-	return res.query
-}
-
-// Domains returns a list of domains discovered in this resolution.
-func (res *ResolutionBase) Domains() (domains []string) {
-	// Not supported by default.
-	return domains
-}
-
-// IPs returns a list of IP addresses discovered in this resolution.
-func (res *ResolutionBase) IPs() (ips []string) {
-	// Not supported by default.
-	return ips
-}
-
-// Option is a Udig configuration option pattern.
-type Option interface {
-	apply(*udigImpl)
-}
-
-// WithDebugLogging activates debug logging.
-func WithDebugLogging() Option {
-	return WithLoggingLevel(LogLevelDebug)
-}
-
-// WithLoggingLevel sets the log level used for logging.
-func WithLoggingLevel(logLevel int) Option {
-	return newUdigOption(func(opt *udigImpl) {
-		LogLevel = logLevel
-	})
-}
-
-// WithStrictMode activates strict mode domain relation (TLD match).
-func WithStrictMode() Option {
-	return WithDomainRelation(StrictDomainRelation)
-}
-
-// WithDomainRelation supplies a given domain relation func for domain heuristic.
-func WithDomainRelation(rel DomainRelationFn) Option {
-	return newUdigOption(func(udig *udigImpl) {
-		if rel != nil {
-			udig.isDomainRelated = rel
-		}
-	})
-}
-
-// WithTimeout changes a default timeout to the supplied value.
-func WithTimeout(timeout time.Duration) Option {
-	return newUdigOption(func(udig *udigImpl) {
-		udig.timeout = timeout
-	})
-}
-
-// WithCTExpired includes expired Certificate Transparency logs in the results (slower).
-func WithCTExpired() Option {
-	return newUdigOption(func(udig *udigImpl) {
-		udig.ctExclude = ""
-	})
-}
-
-// WithCTSince ignores Certificate Transparency logs older than a given time.
-func WithCTSince(t time.Time) Option {
-	return newUdigOption(func(udig *udigImpl) {
-		udig.ctSince = t.Format("2006-01-02")
-	})
-}
-
-// WithMaxDepth limits recursive domain discovery depth.
-// Depth 0 = seed only, 1 = seed + one hop, etc.
-// Default: unlimited (-1).
-func WithMaxDepth(n int) Option {
-	return newUdigOption(func(udig *udigImpl) {
-		udig.maxDepth = n
-	})
-}
-
-/////////////////////////////////////////
-// DNS
-/////////////////////////////////////////
-
-// DNSResolver is a Resolver which is able to resolve a domain
-// to a bunch of the most interesting DNS records.
-//
-// You can configure which query types are actually used,
-// and you can also supply a custom name server.
-// If you don't a name server for each domain is discovered
-// using NS record query, falling back to a local NS
-// (e.g. the one in /etc/resolv.conf).
-type DNSResolver struct {
-	DomainResolver
-	QueryTypes      []uint16
-	NameServer      string
-	Client          *dns.Client
-	nameServerCache map[string]string
-	resolvedDomains map[string]bool
-}
-
-// DNSResolution is a DNS multi-query resolution yielding many DNS records
-// in a form of query-answer pairs.
-type DNSResolution struct {
-	*ResolutionBase
-	Records     []DNSRecordPair
-	Signed      bool     // true when DS or DNSKEY records are present
-	DMARCPolicy string   // p= value from _dmarc TXT (none|quarantine|reject)
-	DMARCRua    []string // rua= reporting URIs
-	DMARCRuf    []string // ruf= reporting URIs
-	NameServer  string
-}
-
-// DNSRecordPair is a pair of DNS record type used in the query
-// and a corresponding record found in the answer.
-type DNSRecordPair struct {
-	QueryType uint16
-	Record    *DNSRecord
-}
-
-// DNSRecord is a wrapper for the actual DNS resource record.
-type DNSRecord struct {
-	dns.RR
-}
-
-/////////////////////////////////////////
-// WHOIS
-/////////////////////////////////////////
-
-// WhoisResolver is a Resolver responsible for resolution of a given
-// domain to a list of WHOIS contacts.
-type WhoisResolver struct {
-	DomainResolver
-	Client *whois.Client
-}
-
-// WhoisResolution is a WHOIS query resolution yielding many contacts.
-type WhoisResolution struct {
-	*ResolutionBase
-	Contacts []WhoisContact
-}
-
-// WhoisContact is a wrapper for any item of interest from a WHOIS banner.
-type WhoisContact struct {
-	RegistryDomainId        string
-	Registrant              string
-	RegistrantOrganization  string
-	RegistrantStateProvince string
-	RegistrantCountry       string
-	Registrar               string
-	RegistrarIanaId         string
-	RegistrarWhoisServer    string
-	RegistrarUrl            string
-	CreationDate            string
-	UpdatedDate             string
-	Registered              string
-	Changed                 string
-	Expire                  string
-	NSSet                   string
-	Contact                 string
-	Name                    string
-	Address                 string
-}
-
-/////////////////////////////////////////
-// TLS
-/////////////////////////////////////////
-
-// TLSResolver is a Resolver responsible for resolution of a given domain
-// to a list of TLS certificates.
-type TLSResolver struct {
-	DomainResolver
-	Client *http.Client
-}
-
-// TLSResolution is a TLS handshake resolution, which yields a certificate chain.
-type TLSResolution struct {
-	*ResolutionBase
-	Certificates []TLSCertificate
-}
-
-// TLSCertificate is a wrapper for the actual x509.Certificate.
-type TLSCertificate struct {
-	x509.Certificate
-}
-
-/////////////////////////////////////////
-// HTTP
-/////////////////////////////////////////
-
-// HTTPResolver is a Resolver responsible for resolution of a given domain
-// to a list of corresponding HTTP headers.
-type HTTPResolver struct {
-	DomainResolver
-	Headers []string
-	Client  *http.Client
-}
-
-// HTTPResolution is a HTTP header resolution yielding many HTTP protocol headers.
-type HTTPResolution struct {
-	*ResolutionBase
-	Headers            []HTTPHeader
-	SecurityTxtDomains []string
-	RobotsTxtDomains   []string
-}
-
-// HTTPHeader is a pair of HTTP header name and corresponding value(s).
-type HTTPHeader struct {
-	Name  string
-	Value []string
-}
-
-/////////////////////////////////////////
-// CT
-/////////////////////////////////////////
-
-// CTResolver is a Resolver responsible for resolution of a given domain
-// to a list of CT logs.
-type CTResolver struct {
-	DomainResolver
-	Client        *http.Client
-	cachedResults map[string]*CTResolution
-	ctSince       string // YYYY-MM-DD
-	ctExclude     string // e.g. "expired"
-}
-
-// CTResolution is a certificate transparency project resolution, which yields a CT log.
-type CTResolution struct {
-	*ResolutionBase
-	Logs []CTAggregatedLog
-}
-
-// CTAggregatedLog is a wrapper of a CT log that is aggregated over all logs
-// with the same CN in time. NotAfterTime and Active are set when logs are fetched.
-type CTAggregatedLog struct {
-	CTLog
-	FirstSeen    string
-	LastSeen     string
-	NotAfterTime time.Time // parsed from NotAfter
-	Active       bool      // true if certificate is still valid (NotAfterTime >= now)
-}
-
-// CTLog is a wrapper for attributes of interest that appear in the CT log.
-// The json mapping comes from crt.sh API schema.
-type CTLog struct {
-	Id         int64  `json:"id"`
-	IssuerName string `json:"issuer_name"`
-	NameValue  string `json:"name_value"`
-	LoggedAt   string `json:"entry_timestamp"`
-	NotBefore  string `json:"not_before"`
-	NotAfter   string `json:"not_after"`
-}
-
-/////////////////////////////////////////
-// BGP
-/////////////////////////////////////////
-
-// BGPResolver is a Resolver which is able to resolve an IP
-// to AS name and ASN.
-//
-// Internally this resolver is leveraging a DNS interface of
-// IP-to-ASN lookup service by Team Cymru.
-type BGPResolver struct {
-	IPResolver
-	Client        *dns.Client
-	cachedResults map[string]*BGPResolution
-}
-
-// BGPResolution is a BGP resolution of a given IP yielding AS records.
-type BGPResolution struct {
-	*ResolutionBase
-	Records []ASRecord
-}
-
-// ASRecord contains information about an Autonomous System (AS).
-type ASRecord struct {
-	Name      string
-	ASN       uint32
-	BGPPrefix string
-	Registry  string
-	Allocated string
-}
-
-/////////////////////////////////////////
-// GEO
-/////////////////////////////////////////
-
-// GeoResolver is a Resolver which is able to resolve an IP to a geographical location.
-type GeoResolver struct {
-	IPResolver
-	enabled       bool
-	db            *ip2location.DB
-	cachedResults map[string]*GeoResolution
-}
-
-// GeoResolution is a GeoIP resolution of a given IP yielding geographical records.
-type GeoResolution struct {
-	*ResolutionBase
-	Record *GeoRecord
-}
-
-// GeoRecord contains information about a geographical location.
-type GeoRecord struct {
-	CountryCode string
-}
-
-/////////////////////////////////////////
-// PTR (reverse DNS)
-/////////////////////////////////////////
-
-// PTRResolver performs reverse DNS (PTR) lookups on discovered IPs.
-type PTRResolver struct {
-	IPResolver
-	Client *dns.Client
-}
-
-// PTRResolution is a PTR lookup result yielding hostnames.
-type PTRResolution struct {
-	*ResolutionBase
-	Hostnames []string
-}
-
-/////////////////////////////////////////
-// RDAP (Registration Data Access Protocol)
-/////////////////////////////////////////
-
-// RDAPResolver implements IPResolver by querying RIR RDAP servers for IP registration
-// data. It uses the IANA RDAP bootstrap to find the correct server per IP and caches
-// results. No API key is required.
-type RDAPResolver struct {
-	IPResolver
-	Client        *http.Client
-	cachedResults map[string]*RDAPResolution
-}
-
-// RDAPResolution is the result of an RDAP IP lookup; Record is nil on error or invalid IP.
-type RDAPResolution struct {
-	*ResolutionBase
-	Record *RDAPRecord
-}
-
-// RDAPRecord holds the main fields from an RDAP "ip network" response (RFC 9083).
-type RDAPRecord struct {
-	Handle       string // registry handle (e.g. NET-104-16-0-0-1)
-	Name         string // network name (e.g. CLOUDFLARENET)
-	StartAddress string
-	EndAddress   string
-	NetworkType  string // e.g. DIRECT ALLOCATION
-	OrgName      string // registrant org from entities
-	AbuseEmail   string // abuse contact email from entities
-}
+func (r *ResolutionBase) Query() string     { return r.query }
+func (r *ResolutionBase) Domains() []string { return nil }
+func (r *ResolutionBase) IPs() []string     { return nil }

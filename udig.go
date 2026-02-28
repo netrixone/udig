@@ -8,6 +8,67 @@ import (
 	"github.com/miekg/dns"
 )
 
+// Option is a Udig configuration option pattern.
+type Option interface {
+	apply(*udigImpl)
+}
+
+// WithDebugLogging activates debug logging.
+func WithDebugLogging() Option {
+	return WithLoggingLevel(LogLevelDebug)
+}
+
+// WithLoggingLevel sets the log level used for logging.
+func WithLoggingLevel(logLevel int) Option {
+	return newUdigOption(func(opt *udigImpl) {
+		LogLevel = logLevel
+	})
+}
+
+// WithStrictMode activates strict mode domain relation (TLD match).
+func WithStrictMode() Option {
+	return WithDomainRelation(StrictDomainRelation)
+}
+
+// WithDomainRelation supplies a given domain relation func for domain heuristic.
+func WithDomainRelation(rel DomainRelationFn) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		if rel != nil {
+			udig.isDomainRelated = rel
+		}
+	})
+}
+
+// WithTimeout changes a default timeout to the supplied value.
+func WithTimeout(timeout time.Duration) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.timeout = timeout
+	})
+}
+
+// WithCTExpired includes expired Certificate Transparency logs in the results (slower).
+func WithCTExpired() Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.ctExclude = ""
+	})
+}
+
+// WithCTSince ignores Certificate Transparency logs older than a given time.
+func WithCTSince(t time.Time) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.ctSince = t.Format("2006-01-02")
+	})
+}
+
+// WithMaxDepth limits recursive domain discovery depth.
+// Depth 0 = seed only, 1 = seed + one hop, etc.
+// Default: unlimited (-1).
+func WithMaxDepth(n int) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.maxDepth = n
+	})
+}
+
 type udigImpl struct {
 	domainResolvers []DomainResolver
 	ipResolvers     []IPResolver
@@ -25,15 +86,15 @@ type udigImpl struct {
 	maxDepth        int // -1 = unlimited (default)
 }
 
-type udigOption struct {
+type optionImpl struct {
 	f func(*udigImpl)
 }
 
-func newUdigOption(f func(*udigImpl)) udigOption {
-	return udigOption{f}
+func newUdigOption(f func(*udigImpl)) optionImpl {
+	return optionImpl{f}
 }
 
-func (opt udigOption) apply(udig *udigImpl) {
+func (opt optionImpl) apply(udig *udigImpl) {
 	opt.f(udig)
 }
 
@@ -43,6 +104,7 @@ func NewUdig(opts ...Option) Udig {
 	udig := newUdigIml(opts...)
 
 	udig.AddDomainResolver(NewDNSResolver(udig.timeout))
+	udig.AddDomainResolver(NewDMARCResolver(udig.timeout))
 	udig.AddDomainResolver(NewWhoisResolver(udig.timeout))
 	udig.AddDomainResolver(NewTLSResolver(udig.timeout))
 	udig.AddDomainResolver(NewHTTPResolver(udig.timeout))
@@ -143,19 +205,18 @@ func (u *udigImpl) resolveDomainInto(domain string, ctx context.Context, resChan
 
 	for _, resolver := range u.domainResolvers {
 		go func(resolver DomainResolver) {
-			resolution := resolver.ResolveDomain(domain)
-			select {
-			case resChan <- resolution:
-				related := u.getRelatedDomains(resolution)
-
-				// Enqueue all related domains.
-				u.enqueueDomains(u.depthOf[domain]+1, related...)
-
-				// Enqueue all discovered IPs.
-				u.enqueueIps(resolution.IPs()...)
-			case <-ctx.Done():
+			defer wg.Done()
+			resolutions := resolver.ResolveDomain(domain)
+			for _, resolution := range resolutions {
+				select {
+				case resChan <- resolution:
+					related := u.getRelatedDomains(resolution)
+					u.enqueueDomains(u.depthOf[domain]+1, related...)
+					u.enqueueIps(resolution.IPs()...)
+				case <-ctx.Done():
+					return
+				}
 			}
-			wg.Done()
 		}(resolver)
 	}
 
@@ -173,8 +234,10 @@ func (u *udigImpl) resolveIPInto(ip string, ch chan<- Resolution) {
 
 	for _, resolver := range u.ipResolvers {
 		go func(resolver IPResolver) {
-			ch <- resolver.ResolveIP(ip)
-			wg.Done()
+			defer wg.Done()
+			for _, res := range resolver.ResolveIP(ip) {
+				ch <- res
+			}
 		}(resolver)
 	}
 
@@ -182,17 +245,15 @@ func (u *udigImpl) resolveIPInto(ip string, ch chan<- Resolution) {
 }
 
 func (u *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution) bool {
-	switch resolution.Type() {
-	case TypeDNS:
-		for _, rr := range resolution.(*DNSResolution).Records {
-			if rr.Record.Header().Rrtype == dns.TypeCNAME && rr.Record.RR.(*dns.CNAME).Target == nextDomain {
-				// Follow DNS CNAME pointers.
+	if resolution.Type() == TypeDNS {
+		dnsRes := resolution.(*DNSResolution)
+		if dnsRes.Record.RR != nil && dnsRes.Record.RR.Header().Rrtype == dns.TypeCNAME {
+			if dnsRes.Record.RR.(*dns.CNAME).Target == nextDomain {
 				return true
 			}
 		}
 	}
 
-	// Otherwise try heuristics.
 	return u.isDomainRelated(nextDomain, resolution.Query())
 }
 

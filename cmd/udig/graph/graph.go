@@ -85,91 +85,87 @@ func (g *Graph) Collect(domain string, options []udig.Option) {
 		case udig.TypeDNS:
 			dnsRes := res.(*udig.DNSResolution)
 			g.addNode(query, nodeTypeDomain)
-			if dnsRes.Signed {
+			if dnsRes.Record.Signed {
 				g.Nodes[query].Label = query + " 🔒"
 			}
 
-			for _, rr := range dnsRes.Records {
-				rrType := dns.TypeToString[rr.Record.RR.Header().Rrtype]
+			if dnsRes.Record.RR != nil {
+				rrType := dns.TypeToString[dnsRes.Record.RR.Header().Rrtype]
 				label := "DNS/" + rrType
-				data := rr.Record.String()
+				data := dnsRes.Record.String()
 				g.addEdges(query, udig.DissectDomainsFromString(data), label, nodeTypeDomain)
 				g.addEdges(query, udig.DissectIpsFromString(data), label, nodeTypeIP)
 			}
 
+		case udig.TypeDMARC:
+			g.addNode(query, nodeTypeDomain)
+			g.addEdges(query, res.Domains(), "DMARC", nodeTypeDomain)
+
 		case udig.TypeTLS:
 			g.addNode(query, nodeTypeDomain)
-			for _, cert := range res.(*udig.TLSResolution).Certificates {
-				g.addEdges(query, udig.DissectDomainsFromStrings(cert.DNSNames), "TLS/SAN", nodeTypeDomain)
-				g.addEdges(query, udig.DissectDomainsFromStrings(cert.CRLDistributionPoints), "TLS/CRL", nodeTypeDomain)
-				g.addEdges(query, udig.DissectDomainsFromString(cert.Issuer.String()), "TLS/Issuer", nodeTypeDomain)
-				g.addEdges(query, udig.DissectDomainsFromString(cert.Subject.CommonName), "TLS/CN", nodeTypeDomain)
-			}
+			cert := &res.(*udig.TLSResolution).Record
+			g.addEdges(query, udig.DissectDomainsFromStrings(cert.DNSNames), "TLS/SAN", nodeTypeDomain)
+			g.addEdges(query, udig.DissectDomainsFromStrings(cert.CRLDistributionPoints), "TLS/CRL", nodeTypeDomain)
+			g.addEdges(query, udig.DissectDomainsFromString(cert.Issuer.String()), "TLS/Issuer", nodeTypeDomain)
+			g.addEdges(query, udig.DissectDomainsFromString(cert.Subject.CommonName), "TLS/CN", nodeTypeDomain)
 
 		case udig.TypeCT:
 			g.addNode(query, nodeTypeDomain)
-			for _, log := range res.(*udig.CTResolution).Logs {
-				label := "CT"
-				if !log.Active {
-					label = "CT/expired"
-				}
-				g.addEdges(query, log.ExtractDomains(), label, nodeTypeDomain)
+			record := &res.(*udig.CTResolution).Record
+			label := "CT"
+			if !record.Active {
+				label = "CT/expired"
 			}
+			g.addEdges(query, record.ExtractDomains(), label, nodeTypeDomain)
 
 		case udig.TypeHTTP:
 			g.addNode(query, nodeTypeDomain)
-			for _, header := range res.(*udig.HTTPResolution).Headers {
-				g.addEdges(query, udig.DissectDomainsFromStrings(header.Value), "HTTP/"+header.Name, nodeTypeDomain)
-			}
+			record := &res.(*udig.HTTPResolution).Record
+			g.addEdges(query, udig.DissectDomainsFromString(record.Value), "HTTP/"+record.Key, nodeTypeDomain)
 
 		case udig.TypeWHOIS:
 			whoisRes := res.(*udig.WhoisResolution)
 			g.addEdges(query, res.Domains(), "WHOIS", nodeTypeDomain)
-
-			for _, contact := range whoisRes.Contacts {
-				contactStr := contact.String()
-				g.addEdges(query, udig.DissectIpsFromString(contactStr), "WHOIS", nodeTypeIP)
-				g.addEdge(query, formatWhoisContact(contact), "WHOIS/contact", nodeTypeWhois)
-			}
+			recordStr := whoisRes.Record.String()
+			g.addEdges(query, udig.DissectIpsFromString(recordStr), "WHOIS", nodeTypeIP)
+			g.addEdge(query, formatWhoisContact(whoisRes.Record), "WHOIS/contact", nodeTypeWhois)
 
 		case udig.TypeBGP:
 			g.addNode(query, nodeTypeIP)
-			for _, as := range res.(*udig.BGPResolution).Records {
-				asNode := fmt.Sprintf("AS%d", as.ASN)
-				if as.Name != "" {
-					asNode = fmt.Sprintf("AS%d (%s)", as.ASN, as.Name)
-				}
-
-				label := "BGP"
-				if as.BGPPrefix != "" {
-					label = "BGP/" + as.BGPPrefix
-				}
-				g.addEdge(query, asNode, label, nodeTypeASN)
+			record := &res.(*udig.BGPResolution).Record
+			asNode := fmt.Sprintf("AS%d", record.ASN)
+			if record.Name != "" {
+				asNode = fmt.Sprintf("AS%d (%s)", record.ASN, record.Name)
 			}
+			label := "BGP"
+			if record.BGPPrefix != "" {
+				label = "BGP/" + record.BGPPrefix
+			}
+			g.addEdge(query, asNode, label, nodeTypeASN)
 
 		case udig.TypeGEO:
 			g.addNode(query, nodeTypeIP)
 			geoRes := res.(*udig.GeoResolution)
-			if geoRes.Record != nil && geoRes.Record.CountryCode != "" {
+			if geoRes.Record.CountryCode != "" {
 				g.addEdge(query, geoRes.Record.CountryCode, "GEO", nodeTypeCountry)
 			}
 
 		case udig.TypePTR:
 			g.addNode(query, nodeTypeIP)
-			g.addEdges(query, res.(*udig.PTRResolution).Hostnames, "PTR", nodeTypeDomain)
+			hostname := res.(*udig.PTRResolution).Record.Hostname
+			if hostname != "" {
+				g.addEdge(query, hostname, "PTR", nodeTypeDomain)
+			}
 
 		case udig.TypeRDAP:
 			g.addNode(query, nodeTypeIP)
 			rdapRes := res.(*udig.RDAPResolution)
-			if rdapRes.Record != nil {
-				nodeID := rdapRes.Record.Name
-				if nodeID == "" {
-					nodeID = "RDAP/" + rdapRes.Record.Handle
-				}
-
-				if nodeID != "" {
-					g.addEdge(query, nodeID, "RDAP", nodeTypeRDAP)
-				}
+			nodeID := rdapRes.Record.Name
+			if nodeID == "" {
+				nodeID = "RDAP/" + rdapRes.Record.Handle
+			}
+			if nodeID != "" && nodeID != "RDAP/" {
+				g.addEdge(query, nodeID, "RDAP", nodeTypeRDAP)
 			}
 		}
 	}

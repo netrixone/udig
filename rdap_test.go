@@ -75,16 +75,16 @@ func Test_RDAPResolver_ResolveIP_mockedHTTP_returnsRecord(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second, Transport: transport}
 	resolver := &RDAPResolver{
 		Client:        client,
-		cachedResults: map[string]*RDAPResolution{},
+		cachedResults: map[string][]Resolution{},
 	}
 
-	resolution := resolver.ResolveIP("192.0.2.1")
-	require.Equal(t, TypeRDAP, resolution.Type())
-	require.Equal(t, "192.0.2.1", resolution.Query())
+	resolutions := resolver.ResolveIP("192.0.2.1")
+	require.Len(t, resolutions, 1)
+	require.Equal(t, TypeRDAP, resolutions[0].Type())
+	require.Equal(t, "192.0.2.1", resolutions[0].Query())
 
-	rdapRes, ok := resolution.(*RDAPResolution)
+	rdapRes, ok := resolutions[0].(*RDAPResolution)
 	require.True(t, ok)
-	require.NotNil(t, rdapRes.Record)
 	assert.Equal(t, "NET-192-0-2-0-1", rdapRes.Record.Handle)
 	assert.Equal(t, "TEST-NET", rdapRes.Record.Name)
 	assert.Equal(t, "192.0.2.0", rdapRes.Record.StartAddress)
@@ -93,12 +93,10 @@ func Test_RDAPResolver_ResolveIP_mockedHTTP_returnsRecord(t *testing.T) {
 	assert.Equal(t, "abuse@example.com", rdapRes.Record.AbuseEmail)
 }
 
-func Test_RDAPResolver_ResolveIP_invalidIP_returnsEmptyRecord(t *testing.T) {
+func Test_RDAPResolver_ResolveIP_invalidIP_returnsEmpty(t *testing.T) {
 	resolver := NewRDAPResolver(5 * time.Second)
-	resolution := resolver.ResolveIP("not-an-ip")
-	rdapRes := resolution.(*RDAPResolution)
-	assert.Nil(t, rdapRes.Record)
-	assert.Equal(t, TypeRDAP, resolution.Type())
+	resolutions := resolver.ResolveIP("not-an-ip")
+	assert.Empty(t, resolutions)
 }
 
 func Test_RDAPResolver_Type_returnsTypeRDAP(t *testing.T) {

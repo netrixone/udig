@@ -63,12 +63,10 @@ func Test_WhoisContact_String(t *testing.T) {
 	assert.Contains(t, s, "2025-01-01")
 }
 
-func Test_WhoisResolution_Domains_extractsFromContacts(t *testing.T) {
+func Test_WhoisResolution_Domains_extractsFromContact(t *testing.T) {
 	res := &WhoisResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Contacts: []WhoisContact{
-			{RegistrarWhoisServer: "whois.example.com", RegistrarUrl: "https://reg.example.com"},
-		},
+		Record:         WhoisContact{RegistrarWhoisServer: "whois.example.com", RegistrarUrl: "https://reg.example.com"},
 	}
 	domains := res.Domains()
 	assert.NotEmpty(t, domains)

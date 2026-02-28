@@ -1,90 +1,38 @@
 package udig
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"time"
 )
-
-/////////////////////////////////////////
-// TLS RESOLVER
-/////////////////////////////////////////
-
-// NewTLSResolver creates a new TLSResolver with sensible defaults.
-func NewTLSResolver(timeout time.Duration) *TLSResolver {
-	transport := &http.Transport{
-		DialContext:         (&net.Dialer{Timeout: timeout}).DialContext,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-		TLSHandshakeTimeout: timeout,
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   timeout,
-	}
-	return &TLSResolver{
-		Client: client,
-	}
-}
-
-// Type returns "TLS".
-func (r *TLSResolver) Type() ResolutionType {
-	return TypeTLS
-}
-
-// ResolveDomain resolves a given domain to a list of TLS certificates.
-func (r *TLSResolver) ResolveDomain(domain string) Resolution {
-	resolution := &TLSResolution{
-		ResolutionBase: &ResolutionBase{query: domain},
-	}
-
-	certificates := r.fetchTLSCertChain(domain)
-	for _, cert := range certificates {
-		resolution.Certificates = append(resolution.Certificates, TLSCertificate{*cert})
-	}
-
-	return resolution
-}
-
-func (r *TLSResolver) fetchTLSCertChain(domain string) (chain []*x509.Certificate) {
-	res, err := r.Client.Get("https://" + domain)
-	if err != nil {
-		LogErr("%s: %s -> %s", TypeTLS, domain, err.Error())
-		return chain
-	}
-	defer res.Body.Close()
-	_, _ = io.Copy(io.Discard, res.Body)
-
-	if res.TLS == nil {
-		return chain
-	}
-
-	return res.TLS.PeerCertificates
-}
 
 /////////////////////////////////////////
 // TLS RESOLUTION
 /////////////////////////////////////////
+
+// TLSResolution is a single TLS certificate result (denormalized: one cert per resolution).
+type TLSResolution struct {
+	*ResolutionBase
+	Record TLSCertificate
+}
 
 // Type returns "TLS".
 func (r *TLSResolution) Type() ResolutionType {
 	return TypeTLS
 }
 
-// Domains returns a list of domains discovered in records within this Resolution.
+// Domains returns domains discovered in this single TLS certificate.
 func (r *TLSResolution) Domains() (domains []string) {
-	for _, cert := range r.Certificates {
-		domains = append(domains, dissectDomainsFromCert(&cert)...)
-	}
-	return domains
+	return dissectDomainsFromCert(&r.Record)
 }
 
 /////////////////////////////////////////
 // TLS CERTIFICATE
 /////////////////////////////////////////
+
+// TLSCertificate is a wrapper for the actual x509.Certificate.
+type TLSCertificate struct {
+	x509.Certificate
+}
 
 func (c *TLSCertificate) String() string {
 	subject := c.Subject.CommonName

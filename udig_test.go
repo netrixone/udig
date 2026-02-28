@@ -26,10 +26,10 @@ type stubDomainResolver struct {
 	res *stubResolution
 }
 
-func (r *stubDomainResolver) ResolveDomain(domain string) Resolution {
+func (r *stubDomainResolver) ResolveDomain(domain string) []Resolution {
 	out := *r.res
 	out.query = domain
-	return &out
+	return []Resolution{&out}
 }
 
 // stubIPResolver returns a fixed resolution for any IP.
@@ -37,8 +37,8 @@ type stubIPResolver struct {
 	typ ResolutionType
 }
 
-func (r *stubIPResolver) ResolveIP(ip string) Resolution {
-	return &stubResolution{query: ip, typ: r.typ, domains: nil, ips: nil}
+func (r *stubIPResolver) ResolveIP(ip string) []Resolution {
+	return []Resolution{&stubResolution{query: ip, typ: r.typ, domains: nil, ips: nil}}
 }
 
 // stubChainResolver returns related domains from a map (for depth tests). Uses TypeHTTP to avoid isCnameOrRelated DNS type assertion.
@@ -46,8 +46,8 @@ type stubChainResolver struct {
 	links map[string][]string
 }
 
-func (r *stubChainResolver) ResolveDomain(domain string) Resolution {
-	return &stubResolution{query: domain, typ: TypeHTTP, domains: r.links[domain], ips: nil}
+func (r *stubChainResolver) ResolveDomain(domain string) []Resolution {
+	return []Resolution{&stubResolution{query: domain, typ: TypeHTTP, domains: r.links[domain], ips: nil}}
 }
 
 func Test_WithMaxDepth_seedOnly(t *testing.T) {

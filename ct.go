@@ -1,187 +1,43 @@
 package udig
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"time"
 )
-
-// crt.sh not_after formats seen in API responses
-var notAfterLayouts = []string{"2006-01-02", "2006-01-02 15:04:05", time.RFC3339}
-
-func parseNotAfter(s string) (t time.Time, active bool) {
-	if s == "" {
-		return time.Time{}, false
-	}
-	for _, layout := range notAfterLayouts {
-		if parsed, err := time.Parse(layout, s); err == nil {
-			return parsed, !parsed.Before(time.Now())
-		}
-	}
-	return time.Time{}, false
-}
-
-/////////////////////////////////////////
-// CT RESOLVER
-/////////////////////////////////////////
-
-const DefaultCTApiUrl = "https://crt.sh"
-
-var CTApiUrl = DefaultCTApiUrl
-
-// NewCTResolver creates a new CTResolver with sensible defaults.
-// since is the minimum log date in YYYY-MM-DD format; exclude is the crt.sh exclude parameter (e.g. "expired").
-func NewCTResolver(timeout time.Duration, since, exclude string) *CTResolver {
-	if since == "" {
-		since = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
-	}
-
-	transport := &http.Transport{
-		DialContext:         (&net.Dialer{Timeout: timeout}).DialContext,
-		TLSHandshakeTimeout: timeout,
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   timeout,
-	}
-
-	return &CTResolver{
-		Client:        client,
-		cachedResults: make(map[string]*CTResolution),
-		ctSince:       since,
-		ctExclude:     exclude,
-	}
-}
-
-// Type returns "CT".
-func (r *CTResolver) Type() ResolutionType {
-	return TypeCT
-}
-
-// ResolveDomain resolves a given domain to a list of TLS certificates.
-func (r *CTResolver) ResolveDomain(domain string) Resolution {
-	resolution := &CTResolution{
-		ResolutionBase: &ResolutionBase{query: domain},
-	}
-
-	if cached := r.cacheLookup(domain); cached != nil {
-		// Ignore, otherwise the output would burn without adding no/little value.
-		return resolution
-	}
-
-	resolution.Logs = r.fetchLogs(domain)
-	r.cachedResults[domain] = resolution
-
-	return resolution
-}
-
-func (r *CTResolver) cacheLookup(domain string) *CTResolution {
-	resolution := r.cachedResults[domain]
-	if resolution != nil {
-		return resolution
-	}
-
-	// Try parent domain as well (unless it is a 2nd order domain).
-	for ; domain != ""; domain = ParentDomainOf(domain) {
-		resolution = r.cachedResults[domain]
-		if resolution != nil {
-			return resolution
-		}
-	}
-
-	return nil
-}
-
-func (r *CTResolver) fetchLogs(domain string) (logs []CTAggregatedLog) {
-	url := fmt.Sprintf("%s/?match=LIKE&exclude=%s&CN=%s&output=json", CTApiUrl, r.ctExclude, domain)
-	res, err := r.Client.Get(url)
-	if err != nil {
-		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
-		return logs
-	}
-	defer res.Body.Close()
-
-	var rawBody []byte
-	if rawBody, err = io.ReadAll(res.Body); err != nil {
-		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
-		return logs
-	}
-
-	rawLogs := make([]CTLog, 0)
-	if err = json.Unmarshal(rawBody, &rawLogs); err != nil {
-		LogErr("%s: %s -> %s", TypeCT, domain, err.Error())
-		return logs
-	}
-
-	// Aggregate the Logs by CN (domain), while keeping min/max log time.
-	aggregatedLogs := make(map[string]*CTAggregatedLog)
-	for _, log := range rawLogs {
-
-		// Skip logs outside of our time scope.
-		// @todo: maybe use a DB to query CRT.sh and filter the logs directly
-		if log.LoggedAt < r.ctSince {
-			continue
-		}
-
-		// Save every unique name record and keep the last known record.
-		if aggregatedLogs[log.NameValue] == nil {
-			aggregatedLogs[log.NameValue] = &CTAggregatedLog{
-				CTLog:     log,
-				FirstSeen: log.LoggedAt,
-				LastSeen:  log.LoggedAt,
-			}
-		} else {
-			// Update log.
-			if aggregatedLogs[log.NameValue].FirstSeen > log.LoggedAt {
-				aggregatedLogs[log.NameValue].FirstSeen = log.LoggedAt
-			}
-			if aggregatedLogs[log.NameValue].LastSeen < log.LoggedAt {
-				aggregatedLogs[log.NameValue].LastSeen = log.LoggedAt
-				aggregatedLogs[log.NameValue].CTLog = log
-			}
-		}
-	}
-
-	for _, log := range aggregatedLogs {
-		log.NotAfterTime, log.Active = parseNotAfter(log.NotAfter)
-		logs = append(logs, *log)
-	}
-
-	return logs
-}
 
 /////////////////////////////////////////
 // CT RESOLUTION
 /////////////////////////////////////////
+
+// CTResolution is a single CT log result (denormalized: one log per resolution).
+type CTResolution struct {
+	*ResolutionBase
+	Record CTAggregatedLog
+}
 
 // Type returns "CT".
 func (r *CTResolution) Type() ResolutionType {
 	return TypeCT
 }
 
-// Domains returns a list of domains discovered in records within this Resolution.
+// Domains returns domains discovered in this single CT log entry.
 func (r *CTResolution) Domains() (domains []string) {
-	seen := make(map[string]bool, 0)
-
-	for _, log := range r.Logs {
-		logDomains := log.ExtractDomains()
-		for _, domain := range logDomains {
-			if !seen[domain] {
-				domains = append(domains, domain)
-				seen[domain] = true
-			}
-		}
-	}
-
-	return domains
+	return r.Record.ExtractDomains()
 }
 
 /////////////////////////////////////////
 // CT AGGREGATED LOG
 /////////////////////////////////////////
+
+// CTAggregatedLog is a wrapper of a CT log that is aggregated over all logs
+// with the same CN in time. NotAfterTime and Active are set when logs are fetched.
+type CTAggregatedLog struct {
+	CTLog
+	FirstSeen    string    // earliest log entry timestamp for this CN
+	LastSeen     string    // latest log entry timestamp for this CN
+	NotAfterTime time.Time // parsed from NotAfter
+	Active       bool      // true if certificate is still valid (NotAfterTime >= now)
+}
 
 func (l *CTAggregatedLog) String() string {
 	return fmt.Sprintf(
@@ -193,6 +49,17 @@ func (l *CTAggregatedLog) String() string {
 /////////////////////////////////////////
 // CT LOG
 /////////////////////////////////////////
+
+// CTLog is a wrapper for attributes of interest that appear in the CT log.
+// The json mapping comes from crt.sh API schema.
+type CTLog struct {
+	Id         int64  `json:"id"`
+	IssuerName string `json:"issuer_name"`
+	NameValue  string `json:"name_value"`
+	LoggedAt   string `json:"entry_timestamp"`
+	NotBefore  string `json:"not_before"`
+	NotAfter   string `json:"not_after"`
+}
 
 func (l *CTLog) ExtractDomains() (domains []string) {
 	domains = append(domains, DissectDomainsFromString(l.NameValue)...)

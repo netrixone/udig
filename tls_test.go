@@ -13,23 +13,10 @@ func Test_TLSResolver_Type_returnsTypeTLS(t *testing.T) {
 	assert.Equal(t, TypeTLS, r.Type())
 }
 
-func Test_TLSResolver_ResolveDomain_invalidDomain_returnsEmptyCertificates(t *testing.T) {
+func Test_TLSResolver_ResolveDomain_invalidDomain_returnsEmpty(t *testing.T) {
 	r := NewTLSResolver(5 * time.Second)
-	resolution := r.ResolveDomain("invalid.domain.invalid.example.invalid")
-	assert.Equal(t, TypeTLS, resolution.Type())
-	tr, ok := resolution.(*TLSResolution)
-	assert.True(t, ok)
-	assert.NotNil(t, tr)
-	assert.Empty(t, tr.Certificates)
-}
-
-func Test_TLSResolution_Domains_extractsFromCert(t *testing.T) {
-	res := &TLSResolution{
-		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Certificates:   []TLSCertificate{},
-	}
-	domains := res.Domains()
-	assert.Empty(t, domains)
+	resolutions := r.ResolveDomain("invalid.domain.invalid.example.invalid")
+	assert.Empty(t, resolutions)
 }
 
 func Test_TLSResolution_Domains_fromCertWithDNSNames(t *testing.T) {
@@ -37,10 +24,9 @@ func Test_TLSResolution_Domains_fromCertWithDNSNames(t *testing.T) {
 	cert.DNSNames = []string{"example.com", "www.example.com"}
 	res := &TLSResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Certificates:   []TLSCertificate{cert},
+		Record:         cert,
 	}
 	domains := res.Domains()
-	// CleanDomain strips www., so both become example.com
 	assert.Contains(t, domains, "example.com")
 	assert.GreaterOrEqual(t, len(domains), 1)
 }

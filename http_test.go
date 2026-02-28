@@ -23,25 +23,21 @@ func Test_HTTPResolver_ResolveDomain_mockServer_returnsHeadersWithDomains(t *tes
 
 	resolver := NewHTTPResolver(10 * time.Second)
 	resolver.Client = server.Client()
-	// Domain is host:port so that "https://"+domain == server.URL
-	domain := server.URL[8:] // strip "https://"
-	resolution := resolver.ResolveDomain(domain)
-	assert.Equal(t, TypeHTTP, resolution.Type())
-	hr, ok := resolution.(*HTTPResolution)
-	assert.True(t, ok)
-	assert.NotNil(t, hr)
-	if len(hr.Headers) > 0 {
-		domains := hr.Domains()
-		assert.NotEmpty(t, domains)
+	domain := server.URL[8:]
+	resolutions := resolver.ResolveDomain(domain)
+	if len(resolutions) > 0 {
+		for _, res := range resolutions {
+			assert.Equal(t, TypeHTTP, res.Type())
+			domains := res.Domains()
+			assert.NotEmpty(t, domains)
+		}
 	}
 }
 
-func Test_HTTPResolution_Domains_extractsDomainsFromHeaders(t *testing.T) {
+func Test_HTTPResolution_Domains_extractsDomainsFromHeader(t *testing.T) {
 	res := &HTTPResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Headers: []HTTPHeader{
-			{Name: "access-control-allow-origin", Value: []string{"https://api.foo.com"}},
-		},
+		Record:         HTTPRecord{Key: "access-control-allow-origin", Value: "https://api.foo.com"},
 	}
 	domains := res.Domains()
 	assert.Contains(t, domains, "api.foo.com")
@@ -65,11 +61,12 @@ func Test_HTTPResolver_ResolveDomain_mockServer_securityTxtAndRobotsTxt(t *testi
 	resolver := NewHTTPResolver(10 * time.Second)
 	resolver.Client = server.Client()
 	domain := server.URL[8:]
-	resolution := resolver.ResolveDomain(domain).(*HTTPResolution)
+	resolutions := resolver.ResolveDomain(domain)
 
-	assert.Contains(t, resolution.SecurityTxtDomains, "vendor.com")
-	assert.Contains(t, resolution.RobotsTxtDomains, "cdn.example.com")
-	allDomains := resolution.Domains()
+	var allDomains []string
+	for _, res := range resolutions {
+		allDomains = append(allDomains, res.Domains()...)
+	}
 	assert.Contains(t, allDomains, "vendor.com")
 	assert.Contains(t, allDomains, "cdn.example.com")
 }
@@ -83,37 +80,22 @@ func Test_HTTPResolver_ResolveDomain_mockServer_securityTxt404_ignored(t *testin
 	resolver := NewHTTPResolver(10 * time.Second)
 	resolver.Client = server.Client()
 	domain := server.URL[8:]
-	resolution := resolver.ResolveDomain(domain).(*HTTPResolution)
+	resolutions := resolver.ResolveDomain(domain)
 
-	assert.Empty(t, resolution.SecurityTxtDomains)
-	assert.Empty(t, resolution.RobotsTxtDomains)
+	assert.Empty(t, resolutions)
 }
 
-func Test_HTTPResolution_Domains_deduplicatesAcrossSources(t *testing.T) {
+func Test_HTTPResolution_Domains_fromSingleHeader(t *testing.T) {
 	res := &HTTPResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Headers: []HTTPHeader{
-			{Name: "access-control-allow-origin", Value: []string{"https://shared.example.com"}},
-		},
-		SecurityTxtDomains: []string{"shared.example.com", "vendor.com"},
-		RobotsTxtDomains:   []string{"shared.example.com", "cdn.example.com"},
+		Record:         HTTPRecord{Key: "access-control-allow-origin", Value: "https://shared.example.com"},
 	}
 	domains := res.Domains()
 	assert.Contains(t, domains, "shared.example.com")
-	assert.Contains(t, domains, "vendor.com")
-	assert.Contains(t, domains, "cdn.example.com")
-	// Count occurrences of shared.example.com — should be exactly 1.
-	count := 0
-	for _, d := range domains {
-		if d == "shared.example.com" {
-			count++
-		}
-	}
-	assert.Equal(t, 1, count)
 }
 
-func Test_HTTPHeader_String(t *testing.T) {
-	h := HTTPHeader{Name: "x-custom", Value: []string{"a", "b"}}
+func Test_HTTPRecord_String(t *testing.T) {
+	h := HTTPRecord{Key: "x-custom", Value: "a, b"}
 	assert.Contains(t, h.String(), "x-custom")
 	assert.Contains(t, h.String(), "a")
 }

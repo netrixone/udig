@@ -3,7 +3,6 @@ package udig
 import (
 	"errors"
 	"net"
-	"strings"
 	"sync"
 	"testing"
 
@@ -18,11 +17,8 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	counterMux := sync.Mutex{}
 	invocationCount := 0
 	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-		// All reads/writes of invocationCount under mutex (callbacks run concurrently).
 		counterMux.Lock()
 		invocationCount++
-		// First 2 invocations are NS lookups (findNameServerFor); then len(QueryTypes)+1 add records.
-		// Return one record for invocations 3, 4, 5 so we get exactly 3 records.
 		count := 0
 		if invocationCount >= 3 && invocationCount <= 3+(recordsAvailable-2)-1 {
 			count = 1
@@ -37,18 +33,14 @@ func Test_When_DnsResolver_Resolve_completes_Then_all_records_are_picked(t *test
 	resolver := NewDNSResolver(DefaultTimeout)
 
 	// Execute.
-	resolution := resolver.ResolveDomain("all.tens.ten").(*DNSResolution)
+	resolutions := resolver.ResolveDomain("all.tens.ten")
 
 	// Assert.
-
-	// 1 invocation per DNS query type + 1 DMARC query + 2 NS queries for all.tens.ten + tens.ten.
 	counterMux.Lock()
 	totalInvocations := invocationCount
 	counterMux.Unlock()
-	assert.Equal(t, len(DefaultDNSQueryTypes)+3, totalInvocations)
-
-	// There should be a record for each mocked response.
-	assert.Len(t, resolution.Records, recordsAvailable-2)
+	assert.Equal(t, len(DefaultDNSQueryTypes)+2, totalInvocations)
+	assert.Len(t, resolutions, recordsAvailable-2)
 }
 
 func Test_When_DnsResolver_Resolve_completes_Then_custom_NameServer_was_used(t *testing.T) {
@@ -88,10 +80,10 @@ func Test_When_queryOne_returns_error_Then_empty_response(t *testing.T) {
 	resolver.QueryTypes = []uint16{dns.TypeA}
 
 	// Execute.
-	resolution := resolver.ResolveDomain("example.com")
+	resolutions := resolver.ResolveDomain("example.com")
 
 	// Assert.
-	assert.Len(t, resolution.Domains(), 0)
+	assert.Empty(t, resolutions)
 }
 
 func Test_That_findNameServerFor_dissects_NS_records(t *testing.T) {
@@ -303,38 +295,13 @@ func Test_DnssecSigned_true_when_DNSKEY_present(t *testing.T) {
 	resolver.NameServer = "1.1.1.1"
 
 	// Execute.
-	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
+	resolutions := resolver.ResolveDomain("example.com")
 
-	// Assert.
-	assert.True(t, resolution.Signed)
-}
-
-func Test_DMARC_fields_parsed_from_dmarc_TXT(t *testing.T) {
-	// Mock.
-	queryOneCallback = func(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-		if strings.HasPrefix(domain, "_dmarc.") && qType == dns.TypeTXT {
-			msg := &dns.Msg{}
-			msg.Answer = append(msg.Answer, &dns.TXT{
-				Hdr: dns.RR_Header{Name: "_dmarc.example.com.", Rrtype: dns.TypeTXT},
-				Txt: []string{"v=DMARC1; p=reject; rua=mailto:dmarc@vendor.com; ruf=mailto:forensic@vendor.com"},
-			})
-			return msg, nil
-		}
-		return &dns.Msg{}, nil
+	// Assert: at least one resolution, all should have Signed=true.
+	assert.NotEmpty(t, resolutions)
+	for _, res := range resolutions {
+		assert.True(t, res.(*DNSResolution).Record.Signed)
 	}
-
-	// Setup.
-	resolver := NewDNSResolver(DefaultTimeout)
-	resolver.NameServer = "1.1.1.1"
-
-	// Execute.
-	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
-
-	// Assert.
-	assert.Equal(t, "reject", resolution.DMARCPolicy)
-	assert.Contains(t, resolution.DMARCRua, "mailto:dmarc@vendor.com")
-	assert.Contains(t, resolution.DMARCRuf, "mailto:forensic@vendor.com")
-	assert.Contains(t, resolution.Domains(), "vendor.com")
 }
 
 func Test_DnssecSigned_false_when_no_DS_or_DNSKEY(t *testing.T) {
@@ -351,10 +318,13 @@ func Test_DnssecSigned_false_when_no_DS_or_DNSKEY(t *testing.T) {
 	resolver.NameServer = "1.1.1.1"
 
 	// Execute.
-	resolution := resolver.ResolveDomain("example.com").(*DNSResolution)
+	resolutions := resolver.ResolveDomain("example.com")
 
-	// Assert.
-	assert.False(t, resolution.Signed)
+	// Assert: at least one resolution, all should have Signed=false.
+	assert.NotEmpty(t, resolutions)
+	for _, res := range resolutions {
+		assert.False(t, res.(*DNSResolution).Record.Signed)
+	}
 }
 
 func Test_dissectDomain_By_unsupported_record(t *testing.T) {
@@ -434,14 +404,15 @@ func Test_dissectIPsFromRecord_By_TXT_record_with_IPs(t *testing.T) {
 	assert.Contains(t, ips, "198.51.100.1")
 }
 
-func Test_DNSResolution_IPs_aggregatesFromRecords(t *testing.T) {
+func Test_DNSResolution_IPs_fromSingleRecord(t *testing.T) {
 	res := &DNSResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Records: []DNSRecordPair{
-			{QueryType: dns.TypeA, Record: &DNSRecord{RR: &dns.A{
+		Record: DNSRecord{
+			RR: &dns.A{
 				Hdr: dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeA},
 				A:   net.ParseIP("192.0.2.1"),
-			}}},
+			},
+			QueryType: dns.TypeA,
 		},
 	}
 	ips := res.IPs()

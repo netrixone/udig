@@ -26,14 +26,13 @@ func Test_CTResolver_ResolveDomain_mockServer_returnsAggregatedLogs(t *testing.T
 	defer func() { CTApiUrl = savedURL }()
 
 	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
-	resolution := resolver.ResolveDomain("example.com")
-	assert.Equal(t, TypeCT, resolution.Type())
-	assert.Equal(t, "example.com", resolution.Query())
-	cr, ok := resolution.(*CTResolution)
-	assert.True(t, ok)
-	assert.NotNil(t, cr)
-	// Aggregation by NameValue: two entries become one with FirstSeen/LastSeen
-	assert.GreaterOrEqual(t, len(cr.Logs), 0)
+	resolutions := resolver.ResolveDomain("example.com")
+	// Aggregation by NameValue: two entries become one.
+	assert.GreaterOrEqual(t, len(resolutions), 0)
+	for _, res := range resolutions {
+		assert.Equal(t, TypeCT, res.Type())
+		assert.Equal(t, "example.com", res.Query())
+	}
 }
 
 func Test_CTResolver_ResolveDomain_cachesResult(t *testing.T) {
@@ -50,18 +49,15 @@ func Test_CTResolver_ResolveDomain_cachesResult(t *testing.T) {
 	defer func() { CTApiUrl = savedURL }()
 
 	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
-	resolver.ResolveDomain("cachetest.example.com")
-	resolver.ResolveDomain("cachetest.example.com")
+	_ = resolver.ResolveDomain("cachetest.example.com")
+	_ = resolver.ResolveDomain("cachetest.example.com")
 	assert.Equal(t, 1, callCount)
 }
 
-func Test_CTResolution_Domains_dedupesFromLogs(t *testing.T) {
+func Test_CTResolution_Domains_fromSingleLog(t *testing.T) {
 	res := &CTResolution{
 		ResolutionBase: &ResolutionBase{query: "example.com"},
-		Logs: []CTAggregatedLog{
-			{CTLog: CTLog{NameValue: "a.example.com\nb.example.com"}},
-			{CTLog: CTLog{NameValue: "a.example.com"}},
-		},
+		Record:         CTAggregatedLog{CTLog: CTLog{NameValue: "a.example.com\nb.example.com"}},
 	}
 	domains := res.Domains()
 	assert.Contains(t, domains, "a.example.com")

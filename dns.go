@@ -1,368 +1,38 @@
 package udig
 
 import (
-	"errors"
 	"fmt"
-	"net"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/miekg/dns"
+	"strings"
 )
-
-var (
-	// DefaultDNSQueryTypes is a list of default DNS RR types that we query.
-	DefaultDNSQueryTypes = [...]uint16{
-		dns.TypeA,
-		dns.TypeNS,
-		dns.TypeSOA,
-		dns.TypeMX,
-		dns.TypeTXT,
-		dns.TypeCAA,
-		dns.TypeSIG,
-		dns.TypeKEY,
-		dns.TypeAAAA,
-		dns.TypeSRV,
-		dns.TypeCERT,
-		dns.TypeDNAME,
-		dns.TypeOPT,
-		dns.TypeKX,
-		dns.TypeDS,
-		dns.TypeRRSIG,
-		dns.TypeNSEC,
-		dns.TypeDNSKEY,
-		dns.TypeNSEC3,
-		dns.TypeNSEC3PARAM,
-		dns.TypeTKEY,
-		dns.TypeTSIG,
-		dns.TypeIXFR,
-		dns.TypeAXFR,
-		dns.TypeMAILB,
-		dns.TypeANY,
-	}
-
-	localNameServer  string     // A name server resolved using resolv.conf.
-	queryOneCallback = queryOne // Callback reference which performs the actual DNS query (monkey patch).
-)
-
-func init() {
-	localNameServer = findLocalNameServer()
-}
-
-// defaultLocalNameServer is used when /etc/resolv.conf is missing or has no servers.
-const defaultLocalNameServer = "127.0.0.1:53"
-
-func findLocalNameServer() string {
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	if err != nil || config == nil {
-		LogErr("Cannot read resolv.conf: %v -> using %s", err, defaultLocalNameServer)
-		return defaultLocalNameServer
-	}
-	if len(config.Servers) == 0 {
-		LogErr("No name server in resolv.conf -> using %s", defaultLocalNameServer)
-		return defaultLocalNameServer
-	}
-	return config.Servers[0] + ":53"
-}
-
-func queryOne(domain string, qType uint16, nameServer string, client *dns.Client) (*dns.Msg, error) {
-	msg := &dns.Msg{}
-	msg.SetQuestion(dns.Fqdn(domain), qType)
-
-	res, _, err := client.Exchange(msg, nameServer)
-	if err != nil {
-		if ne, ok := err.(*net.OpError); ok && ne.Timeout() {
-			return nil, fmt.Errorf("timeout")
-		} else if _, ok := err.(*net.OpError); ok {
-			return nil, fmt.Errorf("network error")
-		}
-		return nil, err
-	} else if res.Rcode != dns.RcodeSuccess {
-		// If the rCode wasn't successful, return an error with the rCode as the string.
-		return nil, errors.New(dns.RcodeToString[res.Rcode])
-	}
-
-	return res, nil
-}
-
-func dissectDomainsFromRecord(record dns.RR) (domains []string) {
-	switch record.Header().Rrtype {
-	case dns.TypeNS:
-		domains = append(domains, (record).(*dns.NS).Ns)
-
-	case dns.TypeCNAME:
-		domains = append(domains, (record).(*dns.CNAME).Target)
-
-	case dns.TypeSOA:
-		domains = append(domains, (record).(*dns.SOA).Mbox)
-
-	case dns.TypeMX:
-		domains = append(domains, (record).(*dns.MX).Mx)
-
-	case dns.TypeTXT:
-		domains = DissectDomainsFromStrings((record).(*dns.TXT).Txt)
-
-	case dns.TypeRRSIG:
-		domains = append(domains, (record).(*dns.RRSIG).SignerName)
-
-	case dns.TypeNSEC:
-		domains = append(domains, (record).(*dns.NSEC).NextDomain)
-
-	case dns.TypeKX:
-		domains = append(domains, (record).(*dns.KX).Exchanger)
-
-	case dns.TypeCAA:
-		caa := (record).(*dns.CAA)
-		if strings.EqualFold(caa.Tag, "iodef") {
-			domains = append(domains, DissectDomainsFromString(caa.Value)...)
-		}
-	}
-
-	for i := range domains {
-		domains[i] = CleanDomain(domains[i])
-	}
-
-	return domains
-}
-
-func dissectIPsFromRecord(record dns.RR) (ips []string) {
-	switch record.Header().Rrtype {
-	case dns.TypeA:
-		ips = append(ips, (record).(*dns.A).A.String())
-
-	case dns.TypeAAAA:
-		ips = append(ips, (record).(*dns.AAAA).AAAA.String())
-
-	case dns.TypeTXT:
-		// For SPF typically.
-		ips = DissectIpsFromStrings((record).(*dns.TXT).Txt)
-	}
-
-	return ips
-}
-
-/////////////////////////////////////////
-// DNS RESOLVER
-/////////////////////////////////////////
-
-// NewDNSResolver creates a new DNS resolver instance pre-populated
-// with sensible defaults.
-func NewDNSResolver(timeout time.Duration) *DNSResolver {
-	return &DNSResolver{
-		QueryTypes:      DefaultDNSQueryTypes[:],
-		Client:          &dns.Client{ReadTimeout: timeout},
-		nameServerCache: map[string]string{},
-		resolvedDomains: map[string]bool{},
-	}
-}
-
-// Type returns "DNS".
-func (r *DNSResolver) Type() ResolutionType {
-	return TypeDNS
-}
-
-// ResolveDomain attempts to resolve a given domain for every DNS record
-// type defined in resolver.QueryTypes using either a user-supplied
-// name-server or dynamically resolved one for this domain.
-func (r *DNSResolver) ResolveDomain(domain string) Resolution {
-	// First find a name server for this domain (if not pre-defined).
-	nameServer := r.findNameServerFor(domain)
-	LogDebug("%s: Using NS %s for domain %s.", TypeDNS, nameServer, domain)
-
-	resolution := &DNSResolution{
-		ResolutionBase: &ResolutionBase{query: domain},
-		NameServer:     nameServer,
-	}
-
-	// Now do a DNS query for each record type (in parallel),
-	// plus an additional _dmarc TXT query.
-	recordChannel := make(chan []DNSRecordPair, 128)
-	var wg sync.WaitGroup
-	wg.Add(len(r.QueryTypes) + 1)
-
-	for _, qType := range r.QueryTypes {
-		go func(qType uint16) {
-			recordChannel <- r.resolveOne(domain, qType, nameServer)
-			wg.Done()
-		}(qType)
-	}
-
-	go func() {
-		recordChannel <- r.resolveOne("_dmarc."+domain, dns.TypeTXT, nameServer)
-		wg.Done()
-	}()
-	wg.Wait()
-
-	// Collect the records.
-	for len(recordChannel) > 0 {
-		resolution.Records = append(resolution.Records, <-recordChannel...)
-	}
-
-	for _, rr := range resolution.Records {
-		rt := rr.Record.RR.Header().Rrtype
-		if rt == dns.TypeDS || rt == dns.TypeDNSKEY {
-			resolution.Signed = true
-			break
-		}
-	}
-
-	parseDMARCRecords(resolution)
-
-	return resolution
-}
-
-func (r *DNSResolver) resolveOne(domain string, qType uint16, nameServer string) (answers []DNSRecordPair) {
-	msg, err := queryOneCallback(domain, qType, nameServer, r.Client)
-	if err != nil {
-		LogErr("%s: %s %s -> %s", TypeDNS, dns.TypeToString[qType], domain, err.Error())
-		return answers
-	}
-
-	for _, rr := range msg.Answer {
-		answers = append(answers, DNSRecordPair{
-			QueryType: qType,
-			Record:    &DNSRecord{rr},
-		})
-	}
-
-	return answers
-}
-
-func (r *DNSResolver) findNameServerFor(domain string) string {
-	// Use user-supplied NS if available.
-	if r.NameServer != "" {
-		return r.NameServer
-	}
-
-	// Check NS cache.
-	if r.nameServerCache[domain] != "" {
-		return r.nameServerCache[domain]
-	}
-
-	// Use DNS NS lookup.
-	nameServer := r.getNameServerFor(domain)
-
-	if nameServer != "" {
-		// OK, NS found.
-	} else if IsSubdomain(domain) {
-		// This is a subdomain -> try the parent.
-		LogDebug("%s: No NS found for subdomain %s -> trying parent domain.", TypeDNS, domain)
-		nameServer = r.findNameServerFor(ParentDomainOf(domain))
-	} else {
-		// Fallback to local NS.
-		LogErr("%s: Could not resolve NS for domain %s -> falling back to local.", TypeDNS, domain)
-		nameServer = localNameServer
-	}
-
-	// Cache the result.
-	r.nameServerCache[domain] = nameServer
-
-	return nameServer
-}
-
-func (r *DNSResolver) getNameServerFor(domain string) string {
-	var nsRecord *dns.NS
-
-	// Do a NS query.
-	msg, err := queryOneCallback(domain, dns.TypeNS, localNameServer, r.Client)
-	if err != nil {
-		LogErr("%s: %s %s -> %s", TypeDNS, "NS", domain, err.Error())
-	} else {
-		// Try to find a NS record.
-		for _, record := range msg.Answer {
-			if record.Header().Rrtype == dns.TypeNS {
-				nsRecord = record.(*dns.NS)
-				break
-			}
-		}
-	}
-
-	if nsRecord != nil {
-		// NS record found -> take the NS name.
-		nameServerFqdn := nsRecord.Ns
-		return nameServerFqdn[:len(nameServerFqdn)-1] + ":53"
-	}
-
-	// No record found.
-	return ""
-}
-
-// parseDMARCRecords scans for _dmarc TXT records and populates the DMARC fields.
-func parseDMARCRecords(resolution *DNSResolution) {
-	var raw string
-	for _, rr := range resolution.Records {
-		if rr.Record.RR.Header().Rrtype != dns.TypeTXT {
-			continue
-		}
-
-		name := strings.TrimSuffix(rr.Record.RR.Header().Name, ".")
-		if !strings.HasPrefix(strings.ToLower(name), "_dmarc.") {
-			continue
-		}
-
-		for _, s := range (rr.Record.RR).(*dns.TXT).Txt {
-			raw += s
-		}
-	}
-
-	if raw == "" {
-		return
-	}
-
-	for _, part := range strings.Split(raw, ";") {
-		part = strings.TrimSpace(part)
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(strings.ToLower(kv[0]))
-		val := strings.TrimSpace(kv[1])
-		switch key {
-		case "p":
-			resolution.DMARCPolicy = strings.ToLower(val)
-
-		case "rua":
-			for _, uri := range strings.Split(val, ",") {
-				uri = strings.TrimSpace(uri)
-				if uri != "" {
-					resolution.DMARCRua = append(resolution.DMARCRua, uri)
-				}
-			}
-
-		case "ruf":
-			for _, uri := range strings.Split(val, ",") {
-				uri = strings.TrimSpace(uri)
-				if uri != "" {
-					resolution.DMARCRuf = append(resolution.DMARCRuf, uri)
-				}
-			}
-		}
-	}
-}
 
 /////////////////////////////////////////
 // DNS RESOLUTION
 /////////////////////////////////////////
+
+// DNSResolution is a single DNS record result (denormalized: one record per resolution).
+type DNSResolution struct {
+	*ResolutionBase
+	Record DNSRecord
+}
 
 // Type returns "DNS".
 func (r *DNSResolution) Type() ResolutionType {
 	return TypeDNS
 }
 
-// Domains returns a list of domains discovered in records within this Resolution.
+// Domains returns domains discovered in this single DNS record.
 func (r *DNSResolution) Domains() (domains []string) {
-	for _, answer := range r.Records {
-		domains = append(domains, dissectDomainsFromRecord(answer.Record.RR)...)
+	if r.Record.RR != nil {
+		domains = append(domains, dissectDomainsFromRecord(r.Record.RR)...)
 	}
 	return domains
 }
 
-// IPs returns a list of IP addresses discovered in this resolution.
+// IPs returns IP addresses discovered in this single DNS record.
 func (r *DNSResolution) IPs() (ips []string) {
-	for _, answer := range r.Records {
-		ips = append(ips, dissectIPsFromRecord(answer.Record.RR)...)
+	if r.Record.RR != nil {
+		ips = append(ips, dissectIPsFromRecord(r.Record.RR)...)
 	}
 	return ips
 }
@@ -370,6 +40,13 @@ func (r *DNSResolution) IPs() (ips []string) {
 /////////////////////////////////////////
 // DNS RECORD
 /////////////////////////////////////////
+
+// DNSRecord is a wrapper for the actual DNS resource record.
+type DNSRecord struct {
+	dns.RR
+	QueryType uint16 // DNS query type used to get this record
+	Signed    bool   // true when DS or DNSKEY records are present in the zone
+}
 
 func (r *DNSRecord) String() string {
 	return fmt.Sprintf("%s %s",

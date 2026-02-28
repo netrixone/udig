@@ -38,7 +38,6 @@ func Test_BGPResolver_ResolveIP_mockedCallback_returnsResolution(t *testing.T) {
 		if qType != dns.TypeTXT {
 			return msg, nil
 		}
-		// IP->ASN query contains "origin"; ASN->AS query is like AS13335.asn.cymru.com
 		if strings.Contains(domain, "origin") {
 			msg.Answer = append(msg.Answer, &dns.TXT{
 				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeTXT},
@@ -55,14 +54,12 @@ func Test_BGPResolver_ResolveIP_mockedCallback_returnsResolution(t *testing.T) {
 	defer func() { queryOneCallback = queryOne }()
 
 	resolver := NewBGPResolver(5 * time.Second)
-	resolution := resolver.ResolveIP("1.0.0.1")
-	assert.Equal(t, TypeBGP, resolution.Type())
-	assert.Equal(t, "1.0.0.1", resolution.Query())
-	br, ok := resolution.(*BGPResolution)
-	assert.True(t, ok)
-	assert.NotNil(t, br)
-	// With mock, we expect one AS record (AS13335, CLOUDFLARENET)
-	assert.GreaterOrEqual(t, len(br.Records), 0)
+	resolutions := resolver.ResolveIP("1.0.0.1")
+	assert.GreaterOrEqual(t, len(resolutions), 0)
+	for _, res := range resolutions {
+		assert.Equal(t, TypeBGP, res.Type())
+		assert.Equal(t, "1.0.0.1", res.Query())
+	}
 }
 
 func Test_ASRecord_String(t *testing.T) {

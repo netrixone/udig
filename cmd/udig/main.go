@@ -39,49 +39,48 @@ func resolve(domain string, options []udig.Option) {
 	for res := range resChan {
 		switch res.Type() {
 		case udig.TypeDNS:
-			for _, rr := range (res).(*udig.DNSResolution).Records {
-				udig.LogInfo("%s: %s %s -> %s", res.Type(), dns.TypeToString[rr.QueryType], res.Query(), formatPayload(rr.Record))
+			record := res.(*udig.DNSResolution).Record
+			signed := ""
+			if record.Signed {
+				signed = " [DNSSEC]"
 			}
+			udig.LogInfo("%s: %s %s -> %s%s", res.Type(), dns.TypeToString[record.QueryType], res.Query(), formatPayload(record), signed)
+
+		case udig.TypeDMARC:
+			record := res.(*udig.DMARCResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypePTR:
-			for _, hostname := range (res).(*udig.PTRResolution).Hostnames {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), hostname)
-			}
+			record := res.(*udig.PTRResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), record)
 
 		case udig.TypeTLS:
-			for _, cert := range (res).(*udig.TLSResolution).Certificates {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&cert))
-			}
+			record := &res.(*udig.TLSResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeWHOIS:
-			for _, contact := range (res).(*udig.WhoisResolution).Contacts {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&contact))
-			}
+			record := &res.(*udig.WhoisResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeHTTP:
-			for _, header := range (res).(*udig.HTTPResolution).Headers {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&header))
-			}
+			record := &res.(*udig.HTTPResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeCT:
-			for _, ctLog := range (res).(*udig.CTResolution).Logs {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&ctLog))
-			}
+			record := &res.(*udig.CTResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeBGP:
-			for _, as := range (res).(*udig.BGPResolution).Records {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(&as))
-			}
+			record := &res.(*udig.BGPResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeGEO:
-			if (res).(*udig.GeoResolution).Record != nil {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.GeoResolution).Record))
-			}
+			record := &res.(*udig.GeoResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 
 		case udig.TypeRDAP:
-			if (res).(*udig.RDAPResolution).Record != nil {
-				udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload((res).(*udig.RDAPResolution).Record))
-			}
+			record := &res.(*udig.RDAPResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatPayload(record))
 		}
 	}
 }
@@ -98,12 +97,12 @@ func isValidDomain(domain string) bool {
 	return true
 }
 
-func formatPayload(resolution fmt.Stringer) string {
+func formatPayload(resolution interface{}) string {
 	if outputJson {
 		result, _ := json.Marshal(resolution)
 		return string(result)
 	}
-	return resolution.String()
+	return fmt.Sprintf("%s", resolution)
 }
 
 func main() {
