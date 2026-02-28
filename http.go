@@ -34,6 +34,6 @@ type HTTPRecord struct {
 	Value string // header value or discovered domain
 }
 
-func (h *HTTPRecord) String() string {
+func (h HTTPRecord) String() string {
 	return fmt.Sprintf("%s: %s", h.Key, h.Value)
 }

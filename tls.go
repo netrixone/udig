@@ -34,7 +34,7 @@ type TLSCertificate struct {
 	x509.Certificate
 }
 
-func (c *TLSCertificate) String() string {
+func (c TLSCertificate) String() string {
 	subject := c.Subject.CommonName
 	if subject == "" {
 		subject = c.Subject.String()

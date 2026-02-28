@@ -35,7 +35,7 @@ type RDAPRecord struct {
 }
 
 // String formats the RDAP record for CLI output (handle, name, range, type, org, abuse).
-func (r *RDAPRecord) String() string {
+func (r RDAPRecord) String() string {
 	parts := []string{}
 	if r.Handle != "" {
 		parts = append(parts, "handle: "+r.Handle)

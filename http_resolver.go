@@ -70,25 +70,35 @@ func (r *HTTPResolver) ResolveDomain(domain string) []Resolution {
 		}
 	}
 
+	seen := make(map[string]bool)
+	seen[domain] = true
+
 	if body := fetchBody(r.Client, baseURL+"/.well-known/security.txt"); body != "" {
 		for _, d := range DissectDomainsFromString(body) {
-			if d == domain {
+			if seen[d] {
 				continue
 			}
+			seen[d] = true
+
 			results = append(results, &HTTPResolution{
-				ResolutionBase: &ResolutionBase{query: domain + "/.well-known/security.txt"},
+				ResolutionBase: &ResolutionBase{query: domain},
 				Record:         HTTPRecord{Key: "security.txt", Value: d},
 			})
 		}
 	}
 
+	clear(seen)
+	seen[domain] = true
+
 	if body := fetchBody(r.Client, baseURL+"/robots.txt"); body != "" {
 		for _, d := range DissectDomainsFromString(body) {
-			if d == domain {
+			if seen[d] {
 				continue
 			}
+			seen[d] = true
+
 			results = append(results, &HTTPResolution{
-				ResolutionBase: &ResolutionBase{query: domain + "/robots.txt"},
+				ResolutionBase: &ResolutionBase{query: domain},
 				Record:         HTTPRecord{Key: "robots.txt", Value: d},
 			})
 		}

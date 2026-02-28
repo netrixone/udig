@@ -48,7 +48,7 @@ type DNSRecord struct {
 	Signed    bool   // true when DS or DNSKEY records are present in the zone
 }
 
-func (r *DNSRecord) String() string {
+func (r DNSRecord) String() string {
 	return fmt.Sprintf("%s %s",
 		dns.TypeToString[r.RR.Header().Rrtype],
 		strings.Replace(r.RR.String(), r.RR.Header().String(), "", 1),

@@ -28,6 +28,6 @@ type GeoRecord struct {
 	CountryCode string // ISO 3166-1 alpha-2 country code (e.g. US, CZ)
 }
 
-func (r *GeoRecord) String() string {
+func (r GeoRecord) String() string {
 	return fmt.Sprintf("country code: %s", r.CountryCode)
 }

@@ -66,7 +66,7 @@ func (l *CTLog) ExtractDomains() (domains []string) {
 	return domains
 }
 
-func (l *CTLog) String() string {
+func (l CTLog) String() string {
 	return fmt.Sprintf(
 		"name: %s, logged_at: %s, not_before: %s, not_after: %s, issuer: %s",
 		l.NameValue, l.LoggedAt, l.NotBefore, l.NotAfter, l.IssuerName,

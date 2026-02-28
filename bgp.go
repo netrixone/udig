@@ -32,7 +32,7 @@ type ASRecord struct {
 	Allocated string // allocation date (YYYY-MM-DD)
 }
 
-func (r *ASRecord) String() string {
+func (r ASRecord) String() string {
 	return fmt.Sprintf(
 		"ASN: %d, AS: %s, prefix: %s, registry: %s, allocated: %s",
 		r.ASN, r.Name, r.BGPPrefix, r.Registry, r.Allocated,

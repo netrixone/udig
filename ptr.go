@@ -36,6 +36,6 @@ type PTRRecord struct {
 	Hostname string
 }
 
-func (r *PTRRecord) String() string {
+func (r PTRRecord) String() string {
 	return r.Hostname
 }

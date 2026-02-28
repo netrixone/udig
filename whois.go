@@ -90,7 +90,7 @@ func (c *WhoisContact) IsEmpty() bool {
 		c.Address == ""
 }
 
-func (c *WhoisContact) String() string {
+func (c WhoisContact) String() string {
 	var entries []string
 
 	if c.RegistryDomainId != "" {

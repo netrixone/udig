@@ -41,7 +41,7 @@ type DMARCRecord struct {
 	DMARCRuf    []string // ruf= reporting URIs
 }
 
-func (r *DMARCRecord) String() string {
+func (r DMARCRecord) String() string {
 	parts := []string{"p=" + r.DMARCPolicy}
 	if len(r.DMARCRua) > 0 {
 		parts = append(parts, "rua="+strings.Join(r.DMARCRua, ","))
