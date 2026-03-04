@@ -25,7 +25,7 @@ func Test_CTResolver_ResolveDomain_mockServer_returnsAggregatedLogs(t *testing.T
 	CTApiUrl = server.URL
 	defer func() { CTApiUrl = savedURL }()
 
-	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
+	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired", "")
 	resolutions := resolver.ResolveDomain("example.com")
 	// Aggregation by NameValue: two entries become one.
 	assert.GreaterOrEqual(t, len(resolutions), 0)
@@ -48,7 +48,7 @@ func Test_CTResolver_ResolveDomain_cachesResult(t *testing.T) {
 	CTApiUrl = server.URL
 	defer func() { CTApiUrl = savedURL }()
 
-	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired")
+	resolver := NewCTResolver(10*time.Second, "2000-01-01", "expired", "")
 	_ = resolver.ResolveDomain("cachetest.example.com")
 	_ = resolver.ResolveDomain("cachetest.example.com")
 	assert.Equal(t, 1, callCount)
