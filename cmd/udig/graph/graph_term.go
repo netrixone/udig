@@ -11,6 +11,7 @@ const (
 	termCyan    = "\033[1;36m"
 	termGreen   = "\033[1;32m"
 	termMagenta = "\033[1;35m"
+	termRed     = "\033[1;31m"
 )
 
 // isSharedLeaf returns true for node types that are shared singletons (country codes,
@@ -26,6 +27,10 @@ func (t nodeType) termColor() string {
 	case nodeTypeASN:
 		return termGreen
 	case nodeTypeCountry:
+		return termMagenta
+	case nodeTypeDNSBL:
+		return termRed
+	case nodeTypeTor:
 		return termMagenta
 	default:
 		return termReset

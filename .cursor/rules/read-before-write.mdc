@@ -1,0 +1,25 @@
+---
+description: LLM must verify file state before writing to avoid overwriting changes
+alwaysApply: true
+---
+
+# Read Before Write
+
+**You MUST check whether a file has been modified before writing to it.**
+
+## Rule
+
+1. **Before any write or search_replace** on an existing file, **read the file** from disk (using the Read tool) to get the current contents.
+2. Do not rely on earlier context, open buffers, or previous tool output for the file’s current state—it may have changed.
+3. Use the freshly read content to construct accurate edits (e.g. correct field names, indentation, and structure).
+
+## Why
+
+- Files can be changed by the user or other tools between your reads and writes.
+- Using stale or assumed content leads to wrong renames, duplicate blocks, or reverted changes.
+- Reading immediately before editing ensures edits match the actual file on disk.
+
+## Applies To
+
+- All edits (StrReplace, Write over existing files).
+- Especially when changing names, types, or structure that might have been updated elsewhere.

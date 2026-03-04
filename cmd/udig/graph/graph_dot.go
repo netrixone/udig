@@ -37,6 +37,12 @@ func dotEdgeStyle(label string) (color, fontcolor string) {
 	case label == "RDAP":
 		return "#89B4FA", "#89B4FA"
 
+	case label == "DNSBL":
+		return "#F38BA8", "#F38BA8"
+
+	case label == "TOR":
+		return "#F5C2E7", "#F5C2E7"
+
 	default:
 		return "#6C7086", "#9399B2"
 	}
@@ -93,6 +99,12 @@ func (g *Graph) EmitDOT() error {
 
 		case nodeTypeRDAP:
 			attrs = `fillcolor="#89B4FA", fontcolor="#1B1B1C"`
+
+		case nodeTypeDNSBL:
+			attrs = `fillcolor="#F38BA8", fontcolor="#1B1B1C"`
+
+		case nodeTypeTor:
+			attrs = `fillcolor="#F5C2E7", fontcolor="#1B1B1C"`
 
 		default:
 			attrs = `fillcolor="#313244", fontcolor="#CDD6F4"`
