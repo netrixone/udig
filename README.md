@@ -7,7 +7,7 @@
 
 **Fast, non-intrusive domain reconnaissance tool written in Go.**
 
-Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration (including CAA, DNSSEC, and DMARC), TLS certificate scraping, WHOIS lookups, HTTP analysis (headers, security.txt and robots.txt), Certificate Transparency log search, BGP ASN mapping, GeoIP resolution, and RDAP (RIR registration data for discovered IPs). Discovered domains are automatically followed and resolved recursively.
+Udig provides a quick overview of a target domain's infrastructure by combining multiple active scanning techniques — DNS enumeration (including CAA, DNSSEC, and DMARC), TLS certificate scraping, WHOIS lookups, HTTP analysis (headers, security.txt and robots.txt), Certificate Transparency log search, BGP ASN mapping, GeoIP resolution, RDAP (RIR registration data for discovered IPs), DNSBL blocklist checks and Tor exit-node detection Discovered domains are automatically followed and resolved recursively.
 
 This is not a full-blown DNS enumerator. There is no brute-forcing, no port scanning, no search engine scraping. udig is designed to be unobtrusive and fast, suitable for long-term experiments with many targets.
 
@@ -24,6 +24,8 @@ This is not a full-blown DNS enumerator. There is no brute-forcing, no port scan
 - **BGP** — maps discovered IPs to autonomous systems via Team Cymru
 - **GeoIP** — resolves country codes for discovered IPs via IP2Location
 - **RDAP** — looks up IP registration metadata (network name, handle, range, abuse contact) via RIR RDAP servers using the IANA bootstrap (no API key)
+- **DNSBL** — checks discovered IPs against DNS blocklists (Barracuda, UCEProtect, DroneBL) and decodes return codes
+- **Tor** — detects Tor nodes (exit, guard, relay) via the Onionoo API; reports nickname, fingerprint, and flags
 - **Recursive crawling** — domains found in any resolution are automatically followed
 - **Output** — colorized human-readable CLI output, JSON or graph as DOT (Graphviz), JSON, or terminal tree (`--graph=dot|json|term`)
 

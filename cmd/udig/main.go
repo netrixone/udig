@@ -81,6 +81,14 @@ func resolve(domain string, options []udig.Option) {
 		case udig.TypeRDAP:
 			record := &res.(*udig.RDAPResolution).Record
 			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatRecord(record))
+
+		case udig.TypeDNSBL:
+			record := &res.(*udig.DNSBLResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatRecord(record))
+
+		case udig.TypeTor:
+			record := &res.(*udig.TorResolution).Record
+			udig.LogInfo("%s: %s -> %s", res.Type(), res.Query(), formatRecord(record))
 		}
 	}
 }

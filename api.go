@@ -47,6 +47,12 @@ const (
 
 	// TypeRDAP is a type of all RDAP (Registration Data Access Protocol) resolutions.
 	TypeRDAP ResolutionType = "RDAP"
+
+	// TypeDNSBL is a type of all DNSBL (DNS Blocklist) resolutions.
+	TypeDNSBL ResolutionType = "DNSBL"
+
+	// TypeTor is a type of all Tor exit-node resolutions.
+	TypeTor ResolutionType = "TOR"
 )
 
 // Udig is a high-level facade for domain resolution which:

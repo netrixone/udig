@@ -17,6 +17,8 @@ const (
 	nodeTypeCountry nodeType = "country"
 	nodeTypeWhois   nodeType = "whois"
 	nodeTypeRDAP    nodeType = "rdap"
+	nodeTypeDNSBL   nodeType = "dnsbl"
+	nodeTypeTor     nodeType = "tor"
 )
 
 func (t nodeType) String() string {
@@ -167,6 +169,24 @@ func (g *Graph) Collect(domain string, options []udig.Option) {
 			if nodeID != "" && nodeID != "RDAP/" {
 				g.addEdge(query, nodeID, "RDAP", nodeTypeRDAP)
 			}
+
+		case udig.TypeDNSBL:
+			g.addNode(query, nodeTypeIP)
+			record := res.(*udig.DNSBLResolution).Record
+			zoneNode := fmt.Sprintf("%s (%s)", record.Zone, record.Meaning)
+			g.addEdge(query, zoneNode, "DNSBL", nodeTypeDNSBL)
+
+		case udig.TypeTor:
+			g.addNode(query, nodeTypeIP)
+			record := res.(*udig.TorResolution).Record
+			label := "Tor Relay"
+			if record.IsExitNode() {
+				label = "Tor Exit Node"
+			}
+			if record.Nickname != "" {
+				label = fmt.Sprintf("%s (%s)", label, record.Nickname)
+			}
+			g.addEdge(query, label, "TOR", nodeTypeTor)
 		}
 	}
 }

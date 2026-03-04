@@ -60,6 +60,15 @@ func WithCTSince(t time.Time) Option {
 	})
 }
 
+// WithCTPGConnStr sets the PostgreSQL connection string for direct crt.sh database access.
+// Pass an empty string to disable PostgreSQL and use the HTTP API exclusively.
+// Defaults to DefaultCTPGConnStr (the public crt.sh read-only endpoint).
+func WithCTPGConnStr(connStr string) Option {
+	return newUdigOption(func(udig *udigImpl) {
+		udig.ctPGConnStr = connStr
+	})
+}
+
 // WithMaxDepth limits recursive domain discovery depth.
 // Depth 0 = seed only, 1 = seed + one hop, etc.
 // Default: unlimited (-1).
@@ -77,12 +86,14 @@ type udigImpl struct {
 	processed       map[string]bool
 	seen            map[string]bool
 	depthOf         map[string]int // crawl depth of each discovered domain
+	mux             sync.Mutex     // protects seen and depthOf
 
 	// Configurable:
 	isDomainRelated DomainRelationFn
 	timeout         time.Duration
 	ctSince         string
 	ctExclude       string
+	ctPGConnStr     string
 	maxDepth        int // -1 = unlimited (default)
 }
 
@@ -108,12 +119,14 @@ func NewUdig(opts ...Option) Udig {
 	udig.AddDomainResolver(NewWhoisResolver(udig.timeout))
 	udig.AddDomainResolver(NewTLSResolver(udig.timeout))
 	udig.AddDomainResolver(NewHTTPResolver(udig.timeout))
-	udig.AddDomainResolver(NewCTResolver(udig.timeout, udig.ctSince, udig.ctExclude))
+	udig.AddDomainResolver(NewCTResolver(udig.timeout, udig.ctSince, udig.ctExclude, udig.ctPGConnStr))
 
 	udig.AddIPResolver(NewBGPResolver(udig.timeout))
 	udig.AddIPResolver(NewGeoResolver())
 	udig.AddIPResolver(NewPTRResolver(udig.timeout))
 	udig.AddIPResolver(NewRDAPResolver(udig.timeout))
+	udig.AddIPResolver(NewDNSBLResolver(udig.timeout))
+	udig.AddIPResolver(NewTorResolver(udig.timeout))
 
 	return udig
 }
@@ -138,6 +151,7 @@ func newUdigIml(opts ...Option) *udigImpl {
 		timeout:         DefaultTimeout,
 		ctSince:         "",
 		ctExclude:       "expired",
+		ctPGConnStr:     DefaultCTPGConnStr,
 		maxDepth:        -1,
 	}
 
@@ -200,6 +214,10 @@ func (u *udigImpl) resolveDomainInto(domain string, ctx context.Context, resChan
 	}
 	defer u.addProcessed(domain)
 
+	// Capture depth before spawning goroutines to avoid a concurrent map read
+	// while other goroutines write depthOf via enqueueDomains.
+	depth := u.depthOf[domain]
+
 	var wg sync.WaitGroup
 	wg.Add(len(u.domainResolvers))
 
@@ -211,7 +229,7 @@ func (u *udigImpl) resolveDomainInto(domain string, ctx context.Context, resChan
 				select {
 				case resChan <- resolution:
 					related := u.getRelatedDomains(resolution)
-					u.enqueueDomains(u.depthOf[domain]+1, related...)
+					u.enqueueDomains(depth+1, related...)
 					u.enqueueIps(resolution.IPs()...)
 				case <-ctx.Done():
 					return
@@ -260,11 +278,21 @@ func (u *udigImpl) isCnameOrRelated(nextDomain string, resolution Resolution) bo
 func (u *udigImpl) getRelatedDomains(resolution Resolution) (domains []string) {
 	for _, nextDomain := range resolution.Domains() {
 		// Crawl new and related domains only.
-		if u.isProcessed(nextDomain) || u.isSeen(nextDomain) {
+		if u.isProcessed(nextDomain) {
 			continue
 		}
 
-		u.addSeen(nextDomain)
+		// Check-then-set must be atomic: two goroutines could both see isSeen==false
+		// and both enqueue the same domain.
+		u.mux.Lock()
+		alreadySeen := u.seen[nextDomain]
+		if !alreadySeen {
+			u.seen[nextDomain] = true
+		}
+		u.mux.Unlock()
+		if alreadySeen {
+			continue
+		}
 
 		if !u.isCnameOrRelated(nextDomain, resolution) {
 			LogDebug("%s: Domain %s is not related to %s -> skipping.", resolution.Type(), nextDomain, resolution.Query())
@@ -281,7 +309,9 @@ func (u *udigImpl) getRelatedDomains(resolution Resolution) (domains []string) {
 // enqueueDomains sets depth for each domain and enqueues it for resolution.
 func (u *udigImpl) enqueueDomains(depth int, domains ...string) {
 	for _, domain := range domains {
+		u.mux.Lock()
 		u.depthOf[domain] = depth
+		u.mux.Unlock()
 		u.domainQueue <- domain
 	}
 }
@@ -298,12 +328,4 @@ func (u *udigImpl) isProcessed(query string) bool {
 
 func (u *udigImpl) addProcessed(query string) {
 	u.processed[query] = true
-}
-
-func (u *udigImpl) isSeen(query string) bool {
-	return u.seen[query]
-}
-
-func (u *udigImpl) addSeen(query string) {
-	u.seen[query] = true
 }
