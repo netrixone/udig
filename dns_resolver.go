@@ -12,6 +12,9 @@ import (
 
 var (
 	// DefaultDNSQueryTypes is a list of default DNS RR types that we query.
+	// Excluded: OPT (EDNS0 pseudo-RR, not a question type), TKEY/TSIG
+	// (protocol authentication mechanisms), AXFR/IXFR (zone transfer
+	// operations requiring special handling), MAILB (obsolete meta-type).
 	DefaultDNSQueryTypes = [...]uint16{
 		dns.TypeA,
 		dns.TypeNS,
@@ -25,7 +28,6 @@ var (
 		dns.TypeSRV,
 		dns.TypeCERT,
 		dns.TypeDNAME,
-		dns.TypeOPT,
 		dns.TypeKX,
 		dns.TypeDS,
 		dns.TypeRRSIG,
@@ -33,11 +35,6 @@ var (
 		dns.TypeDNSKEY,
 		dns.TypeNSEC3,
 		dns.TypeNSEC3PARAM,
-		dns.TypeTKEY,
-		dns.TypeTSIG,
-		dns.TypeIXFR,
-		dns.TypeAXFR,
-		dns.TypeMAILB,
 		dns.TypeANY,
 	}
 
