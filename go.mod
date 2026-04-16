@@ -1,12 +1,12 @@
 module github.com/netrixone/udig
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/akamensky/argparse v1.2.1
 	github.com/domainr/whois v0.0.0-20180714175948-975c7833b02e
 	github.com/ip2location/ip2location-go v8.3.0+incompatible
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.0
 	github.com/miekg/dns v1.1.27
 	github.com/stretchr/testify v1.11.1
 )
